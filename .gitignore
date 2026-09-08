@@ -6,6 +6,17 @@
 /data/
 !**/sample_*.csv          # tiny illustrative samples only (synthetic/public)
 
+# EXCEPTION: the small synthetic sample dataset IS committed, so downstream
+# stages (Lakeflow ingest onward) have real bytes to read without a generator
+# run. ~820 KB, 200 users x 18 months, seed 1729, regenerate with:
+#   python -m datagen --sample-frac 0.004 --months 18 \
+#       --out data/sample --format parquet --no-partitions
+# The full 50k-user / ~15.3M-row dataset stays ignored — regenerate, never commit.
+!/data/
+/data/*
+!/data/sample/
+!/data/sample/**
+
 # Credentials / secrets
 .env
 *.pem

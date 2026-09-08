@@ -1,0 +1,56 @@
+# Full-scale generator run log (50,000 users x 18 months)
+#
+# Synthetic data only; zero real customer data.
+# Command:
+#   python -m datagen --users 50000 --months 18 --out /tmp/fullrun \
+#       --format parquet --no-write --evidence /tmp/full-evidence.md
+#
+# Proves the generator runs at the volume the project brief specifies:
+# 15,288,022 total rows, of which 10,787,722 are daily usage_events
+# (active days only -- 39% density of the 50,000 x 549 = 27.45M full-density
+# grid the brief cites). Realised monthly churn 4.70% vs the 4.70% target.
+# Every referential-integrity, primary-key and range check passes at scale.
+#
+# --no-write was used because the ~350 MB full dataset is deliberately NOT
+# committed (see .gitignore); only the small sample in data/sample/ is.
+# The committed sample evidence is evidence/datagen-sample-run.md.
+#
+# Verbatim stderr log follows.
+
+2026-09-08 19:20:33,509 INFO    datagen | datagen starting | seed=1729 users_requested=50000 sample_frac=1.0 users_effective=50000 months=18 window_start=2025-03-01 window_end=2026-08-31 days=549 target_monthly_churn_rate=0.047 target_reactivation_rate=0.08 power_user_bar=>=4.0 coding hours/day on >=5 days/week campaigns=5 output_format=parquet partitioned=True out_dir=/tmp/fullrun
+2026-09-08 19:20:33,510 INFO    datagen | building population: 50000 users, 18 months (2025-03-01 .. 2026-08-31)
+2026-09-08 19:20:33,840 INFO    datagen | simulating subscription lifecycle + CRM (calibrating churn hazard)
+2026-09-08 19:20:45,837 INFO    datagen | hazard intercept calibrated to -2.22656 in 11 iterations -> monthly churn 0.0470 (target 0.0470)
+2026-09-08 19:20:45,838 INFO    datagen | generating usage_events (active days only)
+2026-09-08 19:21:01,758 INFO    datagen | usage_events: 10,787,722 rows
+2026-09-08 19:21:26,212 INFO    datagen | users                  50,000 rows
+2026-09-08 19:21:26,212 INFO    datagen | subscriptions          54,544 rows
+2026-09-08 19:21:26,212 INFO    datagen | usage_events       10,787,722 rows
+2026-09-08 19:21:26,212 INFO    datagen | feature_adoption    3,464,346 rows
+2026-09-08 19:21:26,212 INFO    datagen | support_tickets        63,558 rows
+2026-09-08 19:21:26,212 INFO    datagen | crm_campaigns               5 rows
+2026-09-08 19:21:26,212 INFO    datagen | crm_touches           294,176 rows
+2026-09-08 19:21:26,212 INFO    datagen | churn_labels          573,671 rows
+2026-09-08 19:21:34,398 INFO    datagen | check: referential integrity subscriptions.user_id -> users.user_id: OK
+2026-09-08 19:21:34,398 INFO    datagen | check: referential integrity usage_events.user_id -> users.user_id: OK
+2026-09-08 19:21:34,398 INFO    datagen | check: referential integrity feature_adoption.user_id -> users.user_id: OK
+2026-09-08 19:21:34,398 INFO    datagen | check: referential integrity support_tickets.user_id -> users.user_id: OK
+2026-09-08 19:21:34,398 INFO    datagen | check: referential integrity crm_touches.user_id -> users.user_id: OK
+2026-09-08 19:21:34,398 INFO    datagen | check: referential integrity churn_labels.user_id -> users.user_id: OK
+2026-09-08 19:21:34,398 INFO    datagen | check: referential integrity crm_touches.campaign_id -> crm_campaigns.campaign_id: OK
+2026-09-08 19:21:34,398 INFO    datagen | check: primary key users(user_id): OK
+2026-09-08 19:21:34,398 INFO    datagen | check: primary key subscriptions(subscription_id): OK
+2026-09-08 19:21:34,398 INFO    datagen | check: primary key usage_events(user_id, event_date): OK
+2026-09-08 19:21:34,398 INFO    datagen | check: primary key feature_adoption(user_id, feature_key, month_start): OK
+2026-09-08 19:21:34,398 INFO    datagen | check: primary key support_tickets(ticket_id): OK
+2026-09-08 19:21:34,398 INFO    datagen | check: primary key crm_campaigns(campaign_id): OK
+2026-09-08 19:21:34,398 INFO    datagen | check: primary key crm_touches(touch_id): OK
+2026-09-08 19:21:34,398 INFO    datagen | check: primary key churn_labels(user_id, month_start): OK
+2026-09-08 19:21:34,398 INFO    datagen | check: usage_events.event_date within window: OK
+2026-09-08 19:21:34,399 INFO    datagen | check: usage_events value ranges plausible: OK
+2026-09-08 19:21:34,399 INFO    datagen | check: monthly churn rate 0.0470 within +/-0.5pt of target 0.0470: OK
+2026-09-08 19:21:34,399 INFO    datagen | check: no usage_events after cancellation (non-reactivated users): OK
+2026-09-08 19:21:34,399 INFO    datagen | check: churn_labels.churn_date set whenever churned: OK
+2026-09-08 19:21:34,399 INFO    datagen | monthly churn rate: 0.0470 (target 0.0470) | users 50,000 | usage_events 10,787,722 rows
+2026-09-08 19:21:34,399 INFO    datagen | datagen finished | total rows 15,288,022
+2026-09-08 19:23:11,104 INFO    datagen | wrote evidence -> /tmp/full-evidence.md
