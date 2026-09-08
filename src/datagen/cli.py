@@ -35,7 +35,7 @@ from datagen.config import (
 )
 from datagen.evidence import render_data_dictionary, render_evidence
 from datagen.pipeline import GenerationResult, generate, validate
-from datagen.writer import checksum_files, checksum_frames, write_all
+from datagen.writer import checksum_files, checksum_frames, unity_catalog_ddl, write_all
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -159,6 +159,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print the data dictionary and exit without generating anything.",
     )
     output.add_argument(
+        "--emit-ddl",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help=(
+            "Write the Unity Catalog registration DDL to PATH and exit. The DDL "
+            "derives purely from the table specs, so it is committed as text at "
+            "sql/unity_catalog.sql and needs no data to regenerate."
+        ),
+    )
+    output.add_argument(
         "--quiet",
         action="store_true",
         help="Suppress the progress log on stderr.",
@@ -176,6 +187,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.dictionary_only:
         sys.stdout.write(render_data_dictionary())
+        return 0
+
+    if args.emit_ddl:
+        args.emit_ddl.parent.mkdir(parents=True, exist_ok=True)
+        args.emit_ddl.write_text(unity_catalog_ddl())
         return 0
 
     config = GeneratorConfig(

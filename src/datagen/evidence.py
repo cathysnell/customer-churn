@@ -629,9 +629,11 @@ def _two_run_verification(two_run: dict[str, object] | None) -> str:
 def _manifest_section(manifest: dict[str, object]) -> str:
     return (
         "## 10. Output manifest (`_manifest.json`)\n\n"
-        "Written alongside the data. This is the handoff contract to the Lakeflow "
-        "ingest stage (files + row counts) and the Unity Catalog stage (target "
-        "catalog/schema + DDL file).\n\n"
+        "Written alongside the data by the run. This is the handoff contract to "
+        "the Lakeflow ingest stage (files + row counts) and the Unity Catalog "
+        "stage (target catalog/schema + DDL file). It is reproduced here in full "
+        "because the data directory itself is gitignored — the dataset is "
+        "regenerated from the committed seed rather than committed.\n\n"
         "```json\n" + json.dumps(manifest, indent=2) + "\n```"
     )
 

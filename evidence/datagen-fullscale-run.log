@@ -17,8 +17,10 @@
 # = 0.046999 (4.6999%) against the 4.70% target.
 # All 23 referential-integrity, primary-key, boundary and range checks pass.
 #
-# The ~350 MB full dataset is deliberately NOT committed (see .gitignore);
-# only the 820 KB sample in data/sample/ is. Regenerate from seed 1729.
+# NO data artifact is committed, at any size: all of data/ is gitignored. The
+# dataset is reproducible-from-code -- regenerate from seed 1729 with the command
+# above, then ingest from that output or from a Databricks Volume. This log and
+# evidence/datagen-fullscale-run.md are the committed record of the run.
 #
 # Verbatim stderr log follows. Timestamps are wall-clock and differ per run.
 

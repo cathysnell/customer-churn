@@ -19,7 +19,7 @@ a laptop, and emits Unity Catalog registration DDL as text for the later stage.
 ```bash
 pip install -r requirements.txt        # or: pip install -e ".[dev]"
 
-# Small fast run — this is what the committed sample + evidence come from (~7s).
+# Small fast run — this is what the committed evidence comes from (~7s).
 python -m datagen --sample-frac 0.004 --months 18 \
     --out data/sample --format parquet --no-partitions \
     --verify-reproducible \
@@ -37,7 +37,7 @@ python -m datagen --dictionary-only
 
 ### Full vs sample
 
-| | Sample (committed) | Full scale |
+| | Sample | Full scale |
 | --- | --- | --- |
 | Command | `--sample-frac 0.004 --no-partitions` | *(defaults)* |
 | Users | 200 | 50,000 |
@@ -54,8 +54,18 @@ At full scale: monthly churn **26,876 / 571,848 = 4.6999%**, reactivation
 **3,444 / 43,090 = 7.9926%**, power-user share **11,146 / 50,000 = 22.29%**, all 23
 consistency checks passing.
 
-**Only the sample is committed** (`data/sample/`, ~820 KB). `.gitignore` blocks
-bulk data; the full dataset is meant to be regenerated, never committed.
+**No data is committed.** `data/` is gitignored in its entirety — no Parquet or CSV
+artifact is tracked, at any size. The dataset is *reproducible from code*: the
+generator is deterministic from committed seed `1729`, so any consumer materialises
+it on demand rather than pulling bytes out of git.
+
+Downstream stages read from a local generator run or from a **Databricks Volume**
+the generator wrote to. What travels with the repo is the **text** proof that the
+generator ran — row counts, `head()` previews, per-table digests and a two-run
+reproducibility comparison under [`evidence/`](../../evidence). The one generated
+artifact that *is* committed is [`sql/unity_catalog.sql`](../../sql/unity_catalog.sql),
+because it is text, derives purely from the table specs, and the Unity Catalog stage
+runs it verbatim (a test asserts it never drifts from the code).
 
 `--sample-frac` scales the **user count, not the time window** — all 18 months of
 daily history are always generated. That is deliberate: the entire point of the
@@ -79,6 +89,7 @@ trend intact and every table proportionally populated.
 | `--format` | `parquet` | `parquet`, `csv` or `both`. |
 | `--no-partitions` | off | One file per table instead of Hive dirs (for samples). |
 | `--evidence PATH` | — | Write the markdown execution-evidence report. |
+| `--emit-ddl PATH` | — | Write the Unity Catalog DDL and exit. Needs no data. |
 | `--verify-reproducible` | off | Regenerate into a temp dir, compare content **and** Parquet-byte digests, record in evidence §9c. |
 | `--no-write` | off | Generate and validate in memory only. |
 | `--dictionary-only` | off | Print the data dictionary and exit. |
@@ -134,20 +145,26 @@ Three design choices make the determinism hold:
 
 ## Output layout
 
+A run writes into whatever `--out` points at (gitignored):
+
 ```
-data/sample/
+data/sample/                # local only — never committed
   users/part-00000.parquet
   usage_events/part-00000.parquet
   ...
   _manifest.json          # row counts, byte sizes, seed, full config, file list
-  _unity_catalog.sql      # CREATE TABLE DDL + PK/FK constraints for the UC stage
+  _unity_catalog.sql      # same DDL as the committed sql/unity_catalog.sql
 ```
 
 With partitioning on (the default), tables declaring `partition_by` are written
 Hive-style — `usage_events/event_date=2026-03-01/part-00000.parquet` — with the
 partition column encoded in the path and dropped from the file body, as Delta
 expects. `_manifest.json` and `_unity_catalog.sql` are the handoff contract to
-the Lakeflow and Unity Catalog stages respectively.
+the Lakeflow and Unity Catalog stages respectively — read from the local run
+output (or a Databricks Volume the run wrote to), since none of it is committed.
+`_unity_catalog.sql` is byte-identical to the committed
+[`sql/unity_catalog.sql`](../../sql/unity_catalog.sql), so the governance stage can
+work straight from the repo without generating anything.
 
 ---
 
@@ -324,14 +341,18 @@ Two notes on how the behavioural tests are written:
 
 ## Execution evidence
 
-All committed as text — the evaluator reads text only, not images.
+All committed as text — the evaluator reads text only, not images. **This is the
+only committed record of a run**: since no data files are tracked, these reports
+carry the row counts, previews and digests that would otherwise require the
+Parquet. Everything in them is regenerable by re-running the documented command.
 
 | Artifact | What it proves |
 | --- | --- |
-| [`evidence/datagen-sample-run.md`](../../evidence/datagen-sample-run.md) | The committed 200-user sample run: exact command, config, row counts, KPIs **each with its numerator/denominator**, full data dictionary, `head()` previews + dtypes for all 8 tables, distributions, per-geo and per-month breakdowns, churn-signal correlations, 23 consistency checks, canonical-content digests (9a), per-file Parquet digests (9b), and the **two-run reproducibility comparison** (9c). |
+| [`evidence/datagen-sample-run.md`](../../evidence/datagen-sample-run.md) | A 200-user sample run: exact command, config, row counts, KPIs **each with its numerator/denominator**, full data dictionary, `head()` previews + dtypes for all 8 tables, distributions, per-geo and per-month breakdowns, churn-signal correlations, 23 consistency checks, canonical-content digests (9a), per-file Parquet digests (9b), and the **two-run reproducibility comparison** (9c). |
 | [`evidence/datagen-fullscale-run.md`](../../evidence/datagen-fullscale-run.md) | The same report at the brief's full volume: 50,000 users, 15,258,791 rows, churn 26,876/571,848 = 4.6999%, all checks passing. |
 | [`evidence/datagen-fullscale-run.log`](../../evidence/datagen-fullscale-run.log) | Verbatim console log of that full-scale run. |
-| [`evidence/pytest-output.txt`](../../evidence/pytest-output.txt) | Verbose 155-test run + ruff output, with the pinned environment recorded. |
+| [`evidence/pytest-output.txt`](../../evidence/pytest-output.txt) | Verbose test run + ruff output, with the pinned environment recorded. |
+| [`sql/unity_catalog.sql`](../../sql/unity_catalog.sql) | The UC registration DDL as committed text; a test asserts it matches the generator exactly. |
 
 Sections 1-11 of the two reports are reproducible from the seed; wall-clock timings
 and log timestamps are quarantined in section 12 so the rest can be diffed

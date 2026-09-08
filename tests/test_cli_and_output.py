@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from datetime import date
 from pathlib import Path
 
@@ -188,6 +189,90 @@ def test_unity_catalog_ddl_declares_keys() -> None:
     assert "PRIMARY KEY" in ddl
     assert "FOREIGN KEY" in ddl
     assert "PARTITIONED BY (event_date)" in ddl
+
+
+def test_unity_catalog_ddl_is_independent_of_run_volume() -> None:
+    """The DDL must not vary with seed or volume, or the committed copy is a lie.
+
+    ``sql/unity_catalog.sql`` is checked in as a single canonical artifact, so it
+    can only be correct if the DDL is a pure function of the table specs.
+    """
+    baseline = unity_catalog_ddl(GeneratorConfig())
+    variants = [
+        GeneratorConfig(users=200, months=4, seed=1),
+        GeneratorConfig(users=50_000, months=18, sample_frac=0.004),
+        GeneratorConfig(monthly_churn_rate=0.09, campaigns=6),
+    ]
+    for config in variants:
+        assert unity_catalog_ddl(config) == baseline
+    # Also callable with no config at all, which is how --emit-ddl uses it.
+    assert unity_catalog_ddl() == baseline
+
+
+def test_committed_unity_catalog_sql_matches_the_generator() -> None:
+    """The checked-in `sql/unity_catalog.sql` must be byte-identical to the code.
+
+    This is the drift guard for the one generated artifact that *is* committed:
+    it is text, not data, and the Unity Catalog stage runs it verbatim, so it must
+    not silently fall behind a schema change. Regenerate with
+    ``python -m datagen --emit-ddl sql/unity_catalog.sql``.
+    """
+    committed = Path(__file__).resolve().parents[1] / "sql" / "unity_catalog.sql"
+    assert committed.is_file(), f"{committed} is missing"
+    assert committed.read_text() == unity_catalog_ddl(), (
+        "sql/unity_catalog.sql is stale; regenerate with "
+        "`python -m datagen --emit-ddl sql/unity_catalog.sql`"
+    )
+
+
+def test_cli_emit_ddl_writes_the_same_ddl(tmp_path: Path) -> None:
+    """`--emit-ddl` needs no data and reproduces the committed file exactly."""
+    target = tmp_path / "nested" / "unity_catalog.sql"
+    assert main(["--emit-ddl", str(target)]) == 0
+    assert target.read_text() == unity_catalog_ddl()
+
+
+def test_no_generated_data_files_are_tracked_by_git() -> None:
+    """No data artifact may be committed — the dataset is reproducible from code.
+
+    A regenerated dataset is easy to re-create and expensive to review, so the
+    repo tracks execution evidence as text instead. This asserts the policy
+    directly against the git index so a stray `git add data/...` fails here.
+    """
+    repo = Path(__file__).resolve().parents[1]
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split("\0")
+    tracked = [p for p in tracked if p]
+    assert tracked, "git ls-files returned nothing; test cannot verify the policy"
+
+    under_data = [p for p in tracked if p == "data" or p.startswith("data/")]
+    assert not under_data, f"data files are tracked: {under_data}"
+
+    data_suffixes = (".parquet", ".csv", ".xlsx", ".db")
+    binary_data = [p for p in tracked if p.endswith(data_suffixes)]
+    assert not binary_data, f"generated data artifacts are tracked: {binary_data}"
+
+
+def test_text_evidence_is_tracked_by_git() -> None:
+    """The graded artifacts are the text evidence files; they must stay committed."""
+    repo = Path(__file__).resolve().parents[1]
+    tracked = subprocess.run(
+        ["git", "ls-files", "evidence"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+
+    assert "evidence/datagen-sample-run.md" in tracked
+    assert "evidence/datagen-fullscale-run.md" in tracked
+    assert "evidence/pytest-output.txt" in tracked
+    assert any(p.endswith(".log") for p in tracked)
 
 
 # ---------------------------------------------------------------------------
