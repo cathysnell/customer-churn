@@ -22,6 +22,7 @@ pip install -r requirements.txt        # or: pip install -e ".[dev]"
 # Small fast run — this is what the committed sample + evidence come from (~7s).
 python -m datagen --sample-frac 0.004 --months 18 \
     --out data/sample --format parquet --no-partitions \
+    --verify-reproducible \
     --evidence evidence/datagen-sample-run.md
 
 # Full scale: 50,000 Pro users x 18 months of daily history.
@@ -41,15 +42,17 @@ python -m datagen --dictionary-only
 | Command | `--sample-frac 0.004 --no-partitions` | *(defaults)* |
 | Users | 200 | 50,000 |
 | Months | 18 (unchanged) | 18 |
-| `usage_events` rows | 43,514 | 10,787,722 |
-| Total rows | 61,148 | 15,288,022 |
+| `usage_events` rows | 43,514 | 10,778,146 |
+| Total rows | 61,137 | 15,258,791 |
 | On disk (snappy parquet) | ~820 KB | ~350 MB |
 | Runtime (8-core laptop) | ~7 s | ~1 min generate, ~2 min with write |
 
-Both row-count columns are measured, not estimated: the sample numbers come from
-the committed evidence file, and the full-scale numbers from an actual
-`--users 50000 --months 18` run (realised churn 4.703%, power-user share 22.4%,
-reactivation 7.98%, all consistency checks passing).
+Both row-count columns are measured, not estimated, and both runs are committed as
+evidence: the sample in [`evidence/datagen-sample-run.md`](../../evidence/datagen-sample-run.md)
+and the full run in [`evidence/datagen-fullscale-run.md`](../../evidence/datagen-fullscale-run.md).
+At full scale: monthly churn **26,876 / 571,848 = 4.6999%**, reactivation
+**3,444 / 43,090 = 7.9926%**, power-user share **11,146 / 50,000 = 22.29%**, all 23
+consistency checks passing.
 
 **Only the sample is committed** (`data/sample/`, ~820 KB). `.gitignore` blocks
 bulk data; the full dataset is meant to be regenerated, never committed.
@@ -76,6 +79,7 @@ trend intact and every table proportionally populated.
 | `--format` | `parquet` | `parquet`, `csv` or `both`. |
 | `--no-partitions` | off | One file per table instead of Hive dirs (for samples). |
 | `--evidence PATH` | — | Write the markdown execution-evidence report. |
+| `--verify-reproducible` | off | Regenerate into a temp dir, compare content **and** Parquet-byte digests, record in evidence §9c. |
 | `--no-write` | off | Generate and validate in memory only. |
 | `--dictionary-only` | off | Print the data dictionary and exit. |
 | `--chunk-users` | `2500` | Users per chunk when generating daily rows. |
@@ -85,11 +89,35 @@ trend intact and every table proportionally populated.
 
 ## Reproducibility
 
-Seed **1729** is committed as `datagen.config.DEFAULT_SEED`. Same seed ⇒
-byte-identical output, asserted by `tests/test_determinism.py` and recorded as
-per-table SHA-256 digests in the evidence file.
+Seed **1729** is committed as `datagen.config.DEFAULT_SEED`. Two distinct claims,
+each proved by a different check — worth keeping straight:
 
-Three design choices make that hold:
+**1. Deterministic logical content (the guaranteed invariant).** For a fixed seed
+and config, every table's column names, column order, row order and cell values
+are identical on every run, on any machine. This is what
+`writer.checksum_frames` hashes — a *canonical text rendering* of each frame
+(header row + `to_csv(index=False)`), **not** the Parquet bytes — and what
+`test_same_seed_produces_identical_content_checksums` asserts. The digests appear
+in section 9a of the evidence.
+
+**2. Byte-identical Parquet files (holds, but scoped to a pinned environment).**
+`test_same_seed_produces_identical_parquet_bytes` writes two full runs to disk and
+compares SHA-256 of the actual `.parquet` files; they match, for both the flat and
+Hive-partitioned layouts. Section 9b of the evidence lists per-file digests and 9c
+commits the two-run comparison. The scope matters: Parquet byte-equality is a
+property of the *writer*, not of this generator — the file footer embeds the
+pyarrow version string, so a pyarrow upgrade changes the bytes while leaving the
+data identical. Claim 1 is the one that always holds.
+
+Run `python -m datagen ... --verify-reproducible` to regenerate into a temp
+directory, compare both digest sets, and record the outcome in the evidence
+(non-zero exit on mismatch).
+
+Note what is *not* reproducible: wall-clock stage timings and log timestamps.
+Those are quarantined in a labelled appendix (section 12) precisely so the rest of
+the report can be diffed byte-for-byte between two runs of the documented command.
+
+Three design choices make the determinism hold:
 
 1. **No wall-clock time.** The window is anchored to a fixed `end_date`
    (`2026-08-31`), never `date.today()`. A run today and a run next year agree.
@@ -223,9 +251,19 @@ would brand a now-dormant user a power user. So `power_user_flag` requires the b
 to hold in a **majority of the months the user was actually active**, which makes
 it mean *sustained* power user and lands the segment near 20-30%.
 
+Precisely: a **week** qualifies when the user hit ≥ 4 coding hours on ≥ 5 days; a
+**month** qualifies when it contains a qualifying week; the **flag** is TRUE when
+qualifying months are ≥ 50% of the months the user was active, over ≥ 2 active
+months (`POWER_USER_MONTH_SHARE` / `POWER_USER_MIN_MONTHS` in `usage.py`). The same
+wording appears in the `users.power_user_flag` column description and in the
+evidence KPI label, so the stricter rule is never mistaken for the loose one.
+
 The flag is measured from the **emitted** `usage_events` rows, not from latent
-state, so any consumer can recompute it from the data and agree
-(`test_power_user_flag_is_recomputable_from_usage_events`).
+state, so any consumer can recompute it and agree.
+`test_power_user_flag_is_recomputable_from_usage_events` recomputes the full
+sustained rule and asserts **set equality** — not merely that flagged users
+qualified at least once, which would pass under the loose rule too — and
+`test_power_user_flag_is_stricter_than_ever_qualified` pins the distinction.
 
 ### CRM motion
 
@@ -243,12 +281,20 @@ A won-back user gets a fresh subscription term, carries an elevated hazard
 (winbacks are fragile), and may churn again — recorded as a distinct term with
 status `churned_after_reactivation`.
 
+Reactivations are capped at **`MAX_REACTIVATIONS = 1`** per user, enforced in both
+winback *eligibility* and *conversion*. The cap is what keeps three things
+consistent: lifecycle state (one reactivation date, one post-winback churn date),
+A03 billing (one reactivation term), and CRM outcomes (one `reactivated` touch).
+`validate()` asserts `reactivated touches == reactivation terms` and prints both
+counts into the evidence, and the test suite compares **per-user cardinality**, so
+a regression cannot hide behind matching user-id sets.
+
 ---
 
 ## Tests
 
 ```bash
-python -m pytest          # 144 tests, ~12s
+python -m pytest          # 155 tests, ~22s
 python -m ruff check src tests
 ```
 
@@ -256,11 +302,11 @@ Coverage maps to the acceptance criteria:
 
 | File | Asserts |
 | --- | --- |
-| `test_determinism.py` | same seed ⇒ identical frames & checksums; different seed ⇒ different data; no wall-clock dependency; sub-stream stability |
+| `test_determinism.py` | same seed ⇒ identical frames, canonical-content digests **and emitted Parquet bytes** (flat + partitioned); different seed ⇒ different data; no wall-clock dependency; sub-stream stability |
 | `test_schema.py` | exact columns in order, dtypes, non-nullability, unique PKs, every column documented, `conform` rejects drift |
-| `test_referential_integrity.py` | no orphan `user_id`/`campaign_id`; no activity before signup or during a lapse; non-overlapping terms; acceptance rate matches its components |
-| `test_churn_signal.py` | churners have lower late-window coding hours / acceptance / session frequency; negative correlations; churn rate in band and tunable; geo variation; retention touches *causally* reduce churn |
-| `test_cli_and_output.py` | volume knobs; parquet round-trip; Hive layout; manifest; UC DDL; evidence sections; CLI flags |
+| `test_referential_integrity.py` | no orphan `user_id`/`campaign_id`; no activity before signup or during a lapse; **support tickets inside an A03 term**; **reactivation touch/term cardinality + the MAX_REACTIVATIONS cap**; non-overlapping terms; acceptance rate matches its components |
+| `test_churn_signal.py` | churners have lower late-window coding hours / acceptance / session frequency; negative correlations; churn rate in band and tunable; geo variation; **power-user flag recomputed exactly from `usage_events`**; retention touches *causally* reduce churn |
+| `test_cli_and_output.py` | volume knobs; parquet round-trip; Hive layout; manifest; UC DDL; evidence sections **incl. churn numerator/denominator and timing segregation**; CLI flags |
 
 Two notes on how the behavioural tests are written:
 
@@ -278,14 +324,18 @@ Two notes on how the behavioural tests are written:
 
 ## Execution evidence
 
-[`evidence/datagen-sample-run.md`](../../evidence/datagen-sample-run.md) — committed
-text (the evaluator reads text only, not images). Contains the exact command, run
-configuration, row counts, realised KPIs vs targets, the full data dictionary,
-`head()` previews and dtypes for all 8 tables, distributions and per-geo /
-per-month breakdowns, the churn-signal correlation check, consistency-check
-results, per-table SHA-256 digests, the output manifest, and the verbatim console
-log. [`evidence/pytest-output.txt`](../../evidence/pytest-output.txt) has the
-passing test run.
+All committed as text — the evaluator reads text only, not images.
+
+| Artifact | What it proves |
+| --- | --- |
+| [`evidence/datagen-sample-run.md`](../../evidence/datagen-sample-run.md) | The committed 200-user sample run: exact command, config, row counts, KPIs **each with its numerator/denominator**, full data dictionary, `head()` previews + dtypes for all 8 tables, distributions, per-geo and per-month breakdowns, churn-signal correlations, 23 consistency checks, canonical-content digests (9a), per-file Parquet digests (9b), and the **two-run reproducibility comparison** (9c). |
+| [`evidence/datagen-fullscale-run.md`](../../evidence/datagen-fullscale-run.md) | The same report at the brief's full volume: 50,000 users, 15,258,791 rows, churn 26,876/571,848 = 4.6999%, all checks passing. |
+| [`evidence/datagen-fullscale-run.log`](../../evidence/datagen-fullscale-run.log) | Verbatim console log of that full-scale run. |
+| [`evidence/pytest-output.txt`](../../evidence/pytest-output.txt) | Verbose 155-test run + ruff output, with the pinned environment recorded. |
+
+Sections 1-11 of the two reports are reproducible from the seed; wall-clock timings
+and log timestamps are quarantined in section 12 so the rest can be diffed
+byte-for-byte.
 
 ---
 

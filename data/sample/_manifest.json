@@ -171,7 +171,7 @@
       "files": [
         "support_tickets/part-00000.parquet"
       ],
-      "bytes": 14737
+      "bytes": 14742
     },
     {
       "table": "crm_campaigns",
@@ -203,7 +203,7 @@
       "asset": "VA (CRM touch + reactivation outcome)",
       "layer": "bronze",
       "grain": "one row per campaign touch sent to a user",
-      "rows": 1109,
+      "rows": 1098,
       "columns": [
         "touch_id",
         "campaign_id",
@@ -226,7 +226,7 @@
       "files": [
         "crm_touches/part-00000.parquet"
       ],
-      "bytes": 23987
+      "bytes": 23856
     },
     {
       "table": "churn_labels",
@@ -261,5 +261,5 @@
       "bytes": 68392
     }
   ],
-  "total_rows": 61148
+  "total_rows": 61137
 }

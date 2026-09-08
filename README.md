@@ -73,9 +73,11 @@ full scale (~15.3M rows), with a `--sample-frac` flag for fast runs.
 - **How to run it, the schema, and the realism model:**
   [`src/datagen/README.md`](src/datagen/README.md)
 - **Execution evidence (text):**
-  [`evidence/datagen-sample-run.md`](evidence/datagen-sample-run.md),
-  [`evidence/datagen-fullscale-run.log`](evidence/datagen-fullscale-run.log),
-  [`evidence/pytest-output.txt`](evidence/pytest-output.txt)
+  [`evidence/datagen-sample-run.md`](evidence/datagen-sample-run.md) (committed
+  sample run, with two-run reproducibility digests),
+  [`evidence/datagen-fullscale-run.md`](evidence/datagen-fullscale-run.md) +
+  [`.log`](evidence/datagen-fullscale-run.log) (50,000-user run, 15,258,791 rows),
+  [`evidence/pytest-output.txt`](evidence/pytest-output.txt) (155 tests + lint)
 - **Committed sample data:** [`data/sample/`](data/sample) — real bytes for the
   ingest stage to read; the full dataset is gitignored and regenerated from the
   committed seed (`1729`).

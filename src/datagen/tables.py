@@ -347,7 +347,16 @@ _FEATURE_ADOPTION_COLUMNS = (
 
 
 def build_support_tickets(population: Population, lifecycle: Lifecycle) -> pd.DataFrame:
-    """Explode the per-month ticket counts from the population into ticket rows."""
+    """Explode the per-month ticket counts from the population into ticket rows.
+
+    Ticket dates are constrained to days the user was actually a paying
+    subscriber. The monthly subscriber mask alone is too coarse: a user who
+    cancels mid-month is a subscriber *for that month*, so sampling uniformly
+    across the month would date some tickets after their cancellation and place
+    them outside every A03 term. Days are therefore drawn from
+    ``lifecycle.subscribed_day``, which resolves cancellation and reactivation
+    boundaries exactly.
+    """
     config = population.config
     counts = np.where(lifecycle.subscriber_month, population.support_tickets, 0)
 
@@ -361,11 +370,20 @@ def build_support_tickets(population: Population, lifecycle: Lifecycle) -> pd.Da
     n_rows = len(row_user)
 
     rng = substream(config.seed, "support.tickets")
-    month_len = _month_lengths(config)
-    day_in_month = np.floor(rng.random(n_rows) * month_len[row_month]).astype(np.int64)
-    created = config.month_starts.values[row_month].astype("datetime64[ns]") + day_in_month.astype(
-        "timedelta64[D]"
-    ).astype("timedelta64[ns]")
+    day_offsets, keep = _subscribed_day_in_month(
+        config, lifecycle.subscribed_day, row_user, row_month, rng
+    )
+    # A month can be flagged as a subscriber month yet contain no subscribed days
+    # (e.g. the month a pre-window user's cancellation lands on day 0). Those
+    # tickets have nowhere valid to sit, so they are dropped rather than misdated.
+    if not keep.all():
+        row_user, row_month = row_user[keep], row_month[keep]
+        day_offsets = day_offsets[keep]
+        n_rows = len(row_user)
+        if n_rows == 0:
+            return pd.DataFrame(columns=list(_SUPPORT_COLUMNS))
+
+    created = config.days.values[day_offsets].astype("datetime64[ns]")
 
     channel = choice_by_weight(rng, n_rows, ref.SUPPORT_CHANNELS)
     category = choice_by_weight(rng, n_rows, ref.SUPPORT_CATEGORIES)
@@ -442,6 +460,47 @@ def _month_lengths(config: GeneratorConfig) -> np.ndarray:
     ends = starts + pd.offsets.MonthEnd(0)
     ends = ends.where(ends <= config.window_end, config.window_end)
     return ((ends - starts).days + 1).to_numpy()
+
+
+def _subscribed_day_in_month(
+    config: GeneratorConfig,
+    subscribed_day: np.ndarray,
+    row_user: np.ndarray,
+    row_month: np.ndarray,
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Pick a day per row on which that user was subscribed, inside that month.
+
+    Args:
+        subscribed_day: ``(n_users, n_days)`` bool mask of paying-subscriber days.
+        row_user / row_month: parallel arrays identifying each output row.
+        rng: draws the day *uniformly among eligible days*.
+
+    Returns:
+        ``(day_offsets, keep)`` — offsets into ``config.days``, and a mask that is
+        False for rows whose (user, month) had no subscribed day at all.
+    """
+    month_first = ((config.month_starts - config.window_start).days).to_numpy()
+    month_len = _month_lengths(config)
+
+    day_offsets = np.zeros(len(row_user), dtype=np.int64)
+    keep = np.zeros(len(row_user), dtype=bool)
+    draw = rng.random(len(row_user))
+
+    # Group by month so each month's slice of the mask is examined once.
+    for month in np.unique(row_month):
+        rows = np.flatnonzero(row_month == month)
+        start, length = int(month_first[month]), int(month_len[month])
+        window = subscribed_day[row_user[rows], start : start + length]
+        available = window.sum(axis=1)
+        has_days = available > 0
+        # Map a uniform draw onto the k-th available day within the month.
+        target = np.floor(draw[rows] * np.maximum(available, 1)).astype(np.int64)
+        rank = np.cumsum(window, axis=1) - 1
+        chosen = np.argmax(rank == target[:, None], axis=1)
+        day_offsets[rows] = start + chosen
+        keep[rows] = has_days
+    return day_offsets, keep
 
 
 # ---------------------------------------------------------------------------

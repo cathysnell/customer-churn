@@ -191,23 +191,78 @@ def test_power_user_segment_is_a_plausible_minority(result: GenerationResult) ->
 def test_power_user_flag_is_recomputable_from_usage_events(
     result: GenerationResult,
 ) -> None:
-    """The published flag must be derivable from the emitted rows.
+    """Recompute the **sustained** rule from `usage_events` and demand equality.
 
-    A consumer who recomputes "had a week with >= 4 hours on >= 5 days" from
-    ``usage_events`` must find that every flagged user clears the bar at least
-    once — otherwise the flag would be unverifiable latent state.
+    Not merely "every flagged user qualified once" — that weaker check would pass
+    even if the flag were the looser ever-qualified rule. This reproduces the
+    documented rule exactly (a qualifying week needs >= `power_user_hours` on
+    >= `power_user_days` days; a qualifying month contains such a week; the flag
+    needs qualifying months to be >= `POWER_USER_MONTH_SHARE` of active months,
+    over >= `POWER_USER_MIN_MONTHS`) and asserts set equality, so the published
+    column is fully verifiable from the emitted data.
+    """
+    import numpy as np
+
+    from datagen.usage import POWER_USER_MIN_MONTHS, POWER_USER_MONTH_SHARE
+
+    config = result.config
+    events = result.frames["usage_events"].copy()
+    events["month"] = events["event_date"].dt.to_period("M")
+    # Monday-anchored weeks, matching the generator's week indexing.
+    events["week"] = events["event_date"].dt.to_period("W-SUN")
+
+    active_months = events.groupby("user_id")["month"].nunique()
+
+    qualifying_days = events[events["coding_hours"] >= config.power_user_hours]
+    per_week = qualifying_days.groupby(["user_id", "week"]).size()
+    good_weeks = per_week[per_week >= config.power_user_days].reset_index()
+
+    if good_weeks.empty:
+        qualifying_months = active_months * 0
+    else:
+        # Attribute each qualifying week to the month containing its first day,
+        # exactly as the generator does.
+        good_weeks["month"] = good_weeks["week"].dt.start_time.dt.to_period("M")
+        qualifying_months = good_weeks.groupby("user_id")["month"].nunique()
+
+    qualifying_months = qualifying_months.reindex(active_months.index, fill_value=0)
+    threshold = np.ceil(POWER_USER_MONTH_SHARE * active_months.clip(lower=1))
+    expected = set(
+        active_months.index[
+            (active_months >= POWER_USER_MIN_MONTHS)
+            & (qualifying_months >= threshold)
+            & (qualifying_months > 0)
+        ]
+    )
+
+    users = result.frames["users"]
+    flagged = set(users.loc[users["power_user_flag"], "user_id"])
+
+    assert flagged == expected, (
+        f"{len(flagged - expected)} flagged users fail the recomputed sustained "
+        f"rule; {len(expected - flagged)} users meet it but are not flagged"
+    )
+
+
+def test_power_user_flag_is_stricter_than_ever_qualified(
+    result: GenerationResult,
+) -> None:
+    """The flag must be the sustained rule, not "qualified in any single week".
+
+    Pins the distinction the schema documents: the loose reading flags materially
+    more users, so if the implementation ever reverted to it this fails.
     """
     config = result.config
-    events = result.frames["usage_events"]
-    qualifying = events[events["coding_hours"] >= config.power_user_hours].copy()
-    qualifying["week"] = qualifying["event_date"].dt.to_period("W")
+    events = result.frames["usage_events"].copy()
+    events["week"] = events["event_date"].dt.to_period("W-SUN")
+    qualifying = events[events["coding_hours"] >= config.power_user_hours]
     per_week = qualifying.groupby(["user_id", "week"]).size()
-    ever_qualified = set(per_week[per_week >= config.power_user_days].index.get_level_values(0))
+    ever = set(per_week[per_week >= config.power_user_days].index.get_level_values(0))
 
-    flagged = set(
-        result.frames["users"].loc[result.frames["users"]["power_user_flag"], "user_id"]
-    )
-    assert flagged <= ever_qualified, f"{len(flagged - ever_qualified)} flagged users never qualified"
+    users = result.frames["users"]
+    flagged = set(users.loc[users["power_user_flag"], "user_id"])
+
+    assert flagged < ever, "flag is not stricter than the ever-qualified rule"
 
 
 def test_reactivation_rate_is_near_the_configured_target(result: GenerationResult) -> None:

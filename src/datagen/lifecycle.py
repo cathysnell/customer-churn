@@ -453,8 +453,15 @@ def _run(
             np.where(decline_ratio < AT_RISK_DECLINE_RATIO, "at_risk", "active"),
             np.where(state == _LAPSED, "lapsed", "not_subscribed"),
         )
-        lapsed_recently = (state == _LAPSED) & (churn_month >= 0) & (
-            (m - churn_month) <= WINBACK_ELIGIBILITY_MONTHS
+        # Winback-eligible: lapsed within the eligibility window AND not already
+        # at the reactivation cap. Excluding capped users here means we never send
+        # a touch that could not possibly convert, rather than sending one and
+        # suppressing the conversion later.
+        lapsed_recently = (
+            (state == _LAPSED)
+            & (churn_month >= 0)
+            & ((m - churn_month) <= WINBACK_ELIGIBILITY_MONTHS)
+            & (reactivations < MAX_REACTIVATIONS)
         )
 
         touched_retention = np.zeros(n, dtype=bool)
@@ -505,6 +512,14 @@ def _run(
                     draws.touch_outcome_u[:, m, c_idx]
                     < np.clip(config.reactivation_rate * campaign.lift, 0.0, 0.95)
                 )
+                # Enforce MAX_REACTIVATIONS. Without this cap a user could be won
+                # back repeatedly across months: each conversion would overwrite
+                # the prior reactivation date and the single second-churn date,
+                # while `subscriptions` (A03) only ever emits one reactivation
+                # term — leaving reactivated touches with no corresponding
+                # billing term. Capping keeps lifecycle state, A03 terms and
+                # touch outcomes mutually consistent.
+                converted &= reactivations < MAX_REACTIVATIONS
                 # First campaign to convert a given user this month wins.
                 converted &= ~reactivate_now
                 reactivate_now |= converted

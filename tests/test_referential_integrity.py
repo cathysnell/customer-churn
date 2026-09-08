@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pandas as pd
 import pytest
 
 from datagen import schemas
@@ -156,6 +157,70 @@ def test_reactivated_users_have_a_reactivation_term(frames: dict) -> None:
     subs = frames["subscriptions"]
     term_users = set(subs.loc[subs["is_reactivation"], "user_id"])
     assert reactivated_users == term_users
+
+
+def test_reactivation_touch_and_term_counts_match_exactly(frames: dict) -> None:
+    """Cardinality, not just set membership: one reactivated touch per term.
+
+    Set equality alone hid a real bug — a user could be won back several times
+    across months (3 reactivated touches) while A03 emitted only one reactivation
+    term, leaving reactivation outcomes with no corresponding billing record. This
+    compares per-user counts and totals so that cannot recur.
+    """
+    touches = frames["crm_touches"]
+    subs = frames["subscriptions"]
+
+    touch_counts = (
+        touches[touches["reactivated"]].groupby("user_id").size().sort_index()
+    )
+    term_counts = (
+        subs[subs["is_reactivation"]].groupby("user_id").size().sort_index()
+    )
+
+    pd.testing.assert_series_equal(
+        touch_counts, term_counts, check_names=False, obj="per-user reactivation counts"
+    )
+    assert int(touches["reactivated"].sum()) == int(subs["is_reactivation"].sum())
+
+
+def test_reactivations_respect_the_configured_cap(frames: dict) -> None:
+    """No user exceeds MAX_REACTIVATIONS, in touches or in billing terms."""
+    from datagen.lifecycle import MAX_REACTIVATIONS
+
+    touches = frames["crm_touches"]
+    subs = frames["subscriptions"]
+
+    per_user_touches = touches[touches["reactivated"]].groupby("user_id").size()
+    per_user_terms = subs[subs["is_reactivation"]].groupby("user_id").size()
+
+    if not per_user_touches.empty:
+        assert per_user_touches.max() <= MAX_REACTIVATIONS
+    if not per_user_terms.empty:
+        assert per_user_terms.max() <= MAX_REACTIVATIONS
+
+
+def test_support_tickets_fall_inside_an_active_subscription_term(frames: dict) -> None:
+    """A14 tickets must sit inside some A03 term — you cannot file while lapsed.
+
+    Previously ticket dates were drawn uniformly across a month the user was
+    *flagged* a subscriber in, which misdated tickets for anyone cancelling
+    mid-month (11/223 in the sample landed outside every term).
+    """
+    tickets = frames["support_tickets"]
+    subs = frames["subscriptions"]
+
+    merged = tickets[["ticket_id", "user_id", "created_date"]].merge(
+        subs[["user_id", "term_start_date", "term_end_date"]], on="user_id", how="left"
+    )
+    open_ended = merged["term_end_date"].isna()
+    inside = (merged["created_date"] >= merged["term_start_date"]) & (
+        open_ended | (merged["created_date"] <= merged["term_end_date"])
+    )
+    covered = merged.loc[inside, "ticket_id"].nunique()
+    assert covered == len(tickets), (
+        f"{len(tickets) - covered} of {len(tickets)} tickets fall outside every "
+        "subscription term"
+    )
 
 
 def test_touch_dates_inside_campaign_run_dates(frames: dict) -> None:

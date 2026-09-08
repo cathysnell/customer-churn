@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS dev_behavior.bronze.users (
   acquisition_channel STRING NOT NULL COMMENT 'How the user was acquired.',
   primary_language STRING NOT NULL COMMENT 'Most-used programming language.',
   ide_theme STRING NOT NULL COMMENT 'Cosmetic preference; a deliberate non-signal.',
-  power_user_flag BOOLEAN NOT NULL COMMENT 'TRUE if the user ever sustained >=4 coding hours/day on >=5 days in a calendar week (the brief''s power-user bar).',
+  power_user_flag BOOLEAN NOT NULL COMMENT 'TRUE for SUSTAINED power users. A week qualifies when the user hit >=4 coding hours/day on >=5 days; a month qualifies when it contains a qualifying week. The flag is TRUE when qualifying months are at least half of the months the user was active, over >=2 active months. Note this is stricter than ''ever qualified once'' (which would flag ~37% of an 18-month population, including now-dormant users). Recomputable from usage_events.',
   tenure_days_at_window_end BIGINT NOT NULL COMMENT 'Days from signup to the end of the observation window.'
 )
 USING DELTA

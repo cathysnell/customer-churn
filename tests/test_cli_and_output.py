@@ -214,7 +214,71 @@ def test_evidence_contains_the_required_sections(result: GenerationResult) -> No
     for name in schemas.table_names():
         assert f"`{name}`" in text
     # The realised churn rate must be printed, not just described.
-    assert f"{result.monthly_churn_rate:.3%}" in text
+    assert f"{result.monthly_churn_rate:.4%}" in text
+    assert f"{result.monthly_churn_rate:.6f}" in text
+
+
+def test_evidence_shows_churn_numerator_and_denominator(
+    result: GenerationResult,
+) -> None:
+    """A rounded rate is not evidence; the fraction behind it must be shown.
+
+    A reader has to be able to divide the numerator by the denominator and land
+    on the claimed rate without re-running anything.
+    """
+    text = render_evidence(result)
+    labels = result.frames["churn_labels"]
+    churn_events = int(labels["churned"].sum())
+    at_risk = len(labels)
+
+    assert f"{churn_events:,} churn events" in text
+    assert f"{at_risk:,} at-risk user-months" in text
+    # Sanity: the printed fraction really does produce the printed rate.
+    assert churn_events / at_risk == pytest.approx(result.monthly_churn_rate)
+
+
+def test_evidence_segregates_nonreproducible_content(result: GenerationResult) -> None:
+    """Timings must live only in the labelled appendix, not the reproducible body.
+
+    Otherwise the documented `--evidence` command could not reproduce the report
+    byte-for-byte, which is the claim the report makes about itself.
+    """
+    text = render_evidence(result, run_log="2026-01-01 12:00:00 INFO datagen | x")
+    appendix_start = text.index("## 12. Appendix — non-reproducible execution details")
+    body, appendix = text[:appendix_start], text[appendix_start:]
+
+    assert "Stage timings" in appendix
+    assert "Stage timings" not in body
+    assert "Console log" in appendix
+    assert "Console log" not in body
+
+
+def test_evidence_describes_exactly_what_is_hashed(result: GenerationResult) -> None:
+    """Section 9 must state that the digests cover content, not Parquet bytes."""
+    text = render_evidence(result)
+    assert "canonical text rendering" in text
+    assert "not** hashes of the Parquet files" in text
+    assert "deterministic logical content" in text
+
+
+def test_evidence_records_two_run_verification(result: GenerationResult) -> None:
+    """Section 9c must carry the actual two-run digests when supplied."""
+    two_run = {
+        "run1_dir": "data/sample",
+        "run2_dir": "<tmp>",
+        "tables": 8,
+        "content_match": True,
+        "files": 8,
+        "files_match": True,
+        "run1_content_combined": "aaa",
+        "run2_content_combined": "aaa",
+        "run1_files_combined": "bbb",
+        "run2_files_combined": "bbb",
+    }
+    text = render_evidence(result, two_run=two_run)
+    assert "9c. Two-run reproducibility check" in text
+    assert "content digests match       : True" in text
+    assert "parquet byte digests match  : True" in text
 
 
 def test_evidence_includes_every_column_description() -> None:
@@ -251,9 +315,34 @@ def test_cli_runs_end_to_end_and_writes_evidence(tmp_path: Path) -> None:
     assert exit_code == 0
     assert evidence.is_file()
     text = evidence.read_text()
-    assert "Console log from the run" in text
+    assert "Console log" in text
     assert "Output manifest" in text
     assert list((tmp_path / "data").rglob("*.csv"))
+
+
+def test_cli_verify_reproducible_records_matching_digests(tmp_path: Path) -> None:
+    """`--verify-reproducible` regenerates and commits the comparison to evidence."""
+    evidence = tmp_path / "evidence.md"
+    exit_code = main(
+        [
+            "--users",
+            "60",
+            "--months",
+            "3",
+            "--out",
+            str(tmp_path / "data"),
+            "--no-partitions",
+            "--evidence",
+            str(evidence),
+            "--verify-reproducible",
+            "--quiet",
+        ]
+    )
+    assert exit_code == 0
+    text = evidence.read_text()
+    assert "9c. Two-run reproducibility check" in text
+    assert "content digests match       : True" in text
+    assert "parquet byte digests match  : True" in text
 
 
 def test_cli_no_write_skips_files(tmp_path: Path) -> None:

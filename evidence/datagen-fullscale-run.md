@@ -13,7 +13,7 @@ reproduces it byte-for-byte (see the checksums at the end).
 **Command that produced this file**
 
 ```console
-$ python -m datagen --sample-frac 0.004 --months 18 --out data/sample --format parquet --no-partitions --verify-reproducible --evidence evidence/datagen-sample-run.md
+$ python -m datagen --users 50000 --months 18 --out /tmp/fullrun --format parquet --no-partitions --evidence /tmp/full-evidence-new.md
 ```
 
 ## 1. Run configuration
@@ -22,8 +22,8 @@ $ python -m datagen --sample-frac 0.004 --months 18 --out data/sample --format p
 | --- | --- |
 | seed | `1729` |
 | users_requested | `50000` |
-| sample_frac | `0.004` |
-| users_effective | `200` |
+| sample_frac | `1.0` |
+| users_effective | `50000` |
 | months | `18` |
 | window_start | `2025-03-01` |
 | window_end | `2026-08-31` |
@@ -34,27 +34,27 @@ $ python -m datagen --sample-frac 0.004 --months 18 --out data/sample --format p
 | campaigns | `5` |
 | output_format | `parquet` |
 | partitioned | `False` |
-| out_dir | `data/sample` |
+| out_dir | `/tmp/fullrun` |
 
-Hazard calibration: intercept **-2.20312** found in
-**10** bisection steps, giving a realised
-monthly churn rate of **0.046965**
-(4.6965%) against the configured
+Hazard calibration: intercept **-2.21875** found in
+**9** bisection steps, giving a realised
+monthly churn rate of **0.046999**
+(4.6999%) against the configured
 target of **0.047000** (4.7000%).
 
 ## 2. Row counts
 
 | Table | Data asset | Layer | Rows | Grain |
 | --- | --- | --- | --- | --- |
-| `users` | VA (identity / persona / entitlements) | bronze | 200 | one row per Pro-tier user |
-| `subscriptions` | A03 — subscription plans & billing history | bronze | 220 | one row per subscription term (a plan a user held for a period) |
-| `usage_events` | A06 — raw product usage events & telemetry | bronze | 43,514 | one row per user per ACTIVE day (inactive days are not emitted) |
-| `feature_adoption` | A07 — feature adoption & activation metrics | bronze | 13,620 | one row per user per feature per month |
-| `support_tickets` | A14 — support tickets, chat logs & CSAT | bronze | 223 | one row per support ticket |
+| `users` | VA (identity / persona / entitlements) | bronze | 50,000 | one row per Pro-tier user |
+| `subscriptions` | A03 — subscription plans & billing history | bronze | 54,557 | one row per subscription term (a plan a user held for a period) |
+| `usage_events` | A06 — raw product usage events & telemetry | bronze | 10,778,146 | one row per user per ACTIVE day (inactive days are not emitted) |
+| `feature_adoption` | A07 — feature adoption & activation metrics | bronze | 3,451,752 | one row per user per feature per month |
+| `support_tickets` | A14 — support tickets, chat logs & CSAT | bronze | 63,101 | one row per support ticket |
 | `crm_campaigns` | VA (marketing saturation / campaign metadata) | bronze | 5 | one row per CRM campaign |
-| `crm_touches` | VA (CRM touch + reactivation outcome) | bronze | 1,098 | one row per campaign touch sent to a user |
-| `churn_labels` | derived label (gold) — supervised training target | gold | 2,257 | one row per user per month the user was a subscriber at month start |
-| **TOTAL** | | | **61,137** | |
+| `crm_touches` | VA (CRM touch + reactivation outcome) | bronze | 289,382 | one row per campaign touch sent to a user |
+| `churn_labels` | derived label (gold) — supervised training target | gold | 571,848 | one row per user per month the user was a subscriber at month start |
+| **TOTAL** | | | **15,258,791** | |
 
 ## 3. Headline KPIs realised in the generated data
 
@@ -66,11 +66,11 @@ arithmetic is checkable rather than asserted.
 
 | KPI | Target (illustrative) | Realised in this run | Numerator / denominator |
 | --- | --- | --- | --- |
-| Pro monthly churn rate | 4.70% | **4.6965%** (`0.046965`) | 106 churn events / 2,257 at-risk user-months |
-| CRM winback reactivation rate | 8.00% | **8.0745%** (`0.080745`) | 13 reactivated / 161 delivered winback touches |
-| Power-user share (sustained: >=4 hrs/day on >=5 days/wk, in >=50% of >=2 active months) | segment definition | **29.5000%** | 59 flagged / 200 users |
-| Users who churned at least once in the window | — | **48.5000%** | over 200 users |
-| `usage_events` density (rows / (users x days)) | active days only | **39.6302%** | 43,514 rows / (200 x 549) |
+| Pro monthly churn rate | 4.70% | **4.6999%** (`0.046999`) | 26,876 churn events / 571,848 at-risk user-months |
+| CRM winback reactivation rate | 8.00% | **7.9926%** (`0.079926`) | 3,444 reactivated / 43,090 delivered winback touches |
+| Power-user share (sustained: >=4 hrs/day on >=5 days/wk, in >=50% of >=2 active months) | segment definition | **22.2920%** | 11,146 flagged / 50,000 users |
+| Users who churned at least once in the window | — | **49.4940%** | over 50,000 users |
+| `usage_events` density (rows / (users x days)) | active days only | **39.2646%** | 10,778,146 rows / (50,000 x 549) |
 
 ## 4. Data dictionary / schema printout
 
@@ -303,15 +303,15 @@ Per-user monthly churn label. `churned = TRUE` means the user was an active subs
 
 Real rows from this run, printed with `DataFrame.head().to_string()`.
 
-### `users` — 200 rows
+### `users` — 50,000 rows
 
 ```text
      user_id signup_date  geo country             plan tier         persona company_size acquisition_channel primary_language     ide_theme  power_user_flag  tenure_days_at_window_end
-USR-00000001  2024-12-04 APAC      JP      pro_monthly  pro         student            1      organic_search       typescript          dark            False                        635
-USR-00000002  2025-09-17 EMEA      FR pro_team_monthly  pro  individual_dev       51-200      organic_search       typescript         light             True                        348
-USR-00000003  2024-10-17   NA      CA      pro_monthly  pro       team_lead        11-50      organic_search           python         light            False                        683
-USR-00000004  2024-10-17 EMEA      SE       pro_annual  pro       team_lead         2-10      organic_search               go          dark            False                        683
-USR-00000005  2025-08-06   NA      MX      pro_monthly  pro startup_founder        1000+         paid_search           python high_contrast             True                        390
+USR-00000001  2024-07-17 APAC      IN      pro_monthly  pro         student            1      organic_search       typescript          dark            False                        775
+USR-00000002  2025-05-03 EMEA      ES pro_team_monthly  pro  individual_dev       51-200      organic_search       typescript         light             True                        485
+USR-00000003  2024-02-10   NA      CA      pro_monthly  pro       team_lead        11-50      organic_search           python         light            False                        933
+USR-00000004  2024-10-23 EMEA      PL       pro_annual  pro       team_lead         2-10      organic_search               go          dark            False                        677
+USR-00000005  2025-08-12   NA      MX      pro_monthly  pro startup_founder        1000+         paid_search           python high_contrast             True                        384
 ```
 
 <details><summary>dtypes</summary>
@@ -334,15 +334,15 @@ tenure_days_at_window_end             int64
 
 </details>
 
-### `subscriptions` — 220 rows
+### `subscriptions` — 54,557 rows
 
 ```text
 subscription_id      user_id          plan_id        plan_name tier billing_period  mrr_usd  list_price_usd term_start_date term_end_date  term_index   status  renewals_count  payment_failures  is_downgrade  is_reactivation cancel_date cancel_reason  revenue_usd
-  SUB-000000001 USR-00000001      pro_monthly      Pro Monthly  pro        monthly     20.0            20.0      2024-12-04    2026-07-08           0 canceled              16                 0         False            False  2026-07-08 too_expensive       330.00
-  SUB-000000002 USR-00000002 pro_team_monthly Pro Team Monthly  pro        monthly     40.0            40.0      2025-09-17           NaT           0   active              11                 0         False            False         NaT          None       465.33
-  SUB-000000003 USR-00000003      pro_monthly      Pro Monthly  pro        monthly     20.0            20.0      2024-10-17    2025-08-03           0 canceled               5                 0         False            False  2025-08-03 stopped_using       104.00
-  SUB-000000004 USR-00000004       pro_annual       Pro Annual  pro         annual     16.0           192.0      2024-10-17           NaT           0   active               1                 0         False            False         NaT          None       292.80
-  SUB-000000005 USR-00000005      pro_monthly      Pro Monthly  pro        monthly     20.0            20.0      2025-08-06           NaT           0   active              13                 0         False            False         NaT          None       260.67
+  SUB-000000001 USR-00000001      pro_monthly      Pro Monthly  pro        monthly     20.0            20.0      2024-07-17           NaT           0   active              18                 0         False            False         NaT          None       366.00
+  SUB-000000002 USR-00000002 pro_team_monthly Pro Team Monthly  pro        monthly     40.0            40.0      2025-05-03           NaT           0   active              16                 0         False            False         NaT          None       648.00
+  SUB-000000003 USR-00000003      pro_monthly      Pro Monthly  pro        monthly     20.0            20.0      2024-02-10    2025-08-03           0 canceled               5                 0         False            False  2025-08-03 stopped_using       104.00
+  SUB-000000004 USR-00000004       pro_annual       Pro Annual  pro         annual     16.0           192.0      2024-10-23           NaT           0   active               1                 0         False            False         NaT          None       292.80
+  SUB-000000005 USR-00000005      pro_monthly      Pro Monthly  pro        monthly     20.0            20.0      2025-08-12           NaT           0   active              12                 0         False            False         NaT          None       256.67
 ```
 
 <details><summary>dtypes</summary>
@@ -371,15 +371,15 @@ revenue_usd                float64
 
 </details>
 
-### `usage_events` — 43,514 rows
+### `usage_events` — 10,778,146 rows
 
 ```text
 event_date      user_id  geo  coding_hours  ai_suggestion_acceptance_rate  session_frequency  suggestions_shown  suggestions_accepted  lines_of_code_written  files_touched  ai_requests  is_weekend
-2025-03-01 USR-00000001 APAC         1.096                         0.3721                  5                 43                    16                     66              4            5        True
-2025-03-01 USR-00000003   NA         4.204                         0.3429                  1                140                    48                    238             13           15        True
-2025-03-01 USR-00000011 EMEA         3.844                         0.3733                  5                150                    56                    226             17           12        True
-2025-03-01 USR-00000013   NA         2.334                         0.4384                  3                 73                    32                    176             10            4        True
-2025-03-01 USR-00000017 EMEA         1.934                         0.3594                  1                 64                    23                    125             12            9        True
+2025-03-01 USR-00000001 APAC         1.096                         0.7429                  2                 35                    26                     65              3            3        True
+2025-03-01 USR-00000003   NA         2.212                         0.3333                  3                 72                    24                    126              4            9        True
+2025-03-01 USR-00000011 EMEA         3.248                         0.4340                  2                106                    46                    184             11            9        True
+2025-03-01 USR-00000013   NA         1.873                         0.5385                  1                 52                    28                    116              8            6        True
+2025-03-01 USR-00000017 EMEA         2.897                         0.4259                  1                108                    46                    184             10            7        True
 ```
 
 <details><summary>dtypes</summary>
@@ -401,15 +401,15 @@ is_weekend                                 bool
 
 </details>
 
-### `feature_adoption` — 13,620 rows
+### `feature_adoption` — 3,451,752 rows
 
 ```text
 month_start      user_id     feature_key             feature_name feature_family  is_adopted first_activation_date  activation_count  active_days  depth_score
- 2025-03-01 USR-00000001      agent_mode Agentic Multi-Step Edits        agentic       False                   NaT                 0            0       0.0000
- 2025-03-01 USR-00000001   codebase_chat      Codebase-Aware Chat        core_ai       False                   NaT                 0            0       0.0000
- 2025-03-01 USR-00000001 multi_file_edit          Multi-File Edit        agentic       False                   NaT                 0            0       0.0000
- 2025-03-01 USR-00000001   project_rules      Project Rules Files  customization       False                   NaT                 0            0       0.0000
- 2025-03-01 USR-00000001  tab_completion    Inline Tab Completion        core_ai        True            2025-03-01               310           14       0.7778
+ 2025-03-01 USR-00000001      agent_mode Agentic Multi-Step Edits        agentic       False                   NaT                 0            0          0.0
+ 2025-03-01 USR-00000001   codebase_chat      Codebase-Aware Chat        core_ai       False                   NaT                 0            0          0.0
+ 2025-03-01 USR-00000001 multi_file_edit          Multi-File Edit        agentic       False                   NaT                 0            0          0.0
+ 2025-03-01 USR-00000001   project_rules      Project Rules Files  customization       False                   NaT                 0            0          0.0
+ 2025-03-01 USR-00000001  tab_completion    Inline Tab Completion        core_ai       False                   NaT                 0            0          0.0
 ```
 
 <details><summary>dtypes</summary>
@@ -429,15 +429,15 @@ depth_score                     float64
 
 </details>
 
-### `support_tickets` — 223 rows
+### `support_tickets` — 63,101 rows
 
 ```text
-    ticket_id      user_id created_date         channel           category  priority  chat_message_count  first_response_minutes  resolution_hours  reopened_count  is_escalated  csat_score  resolved
-TCK-000000001 USR-00000149   2025-03-06           email    feature_request P2_normal                   7                     194              4.46               0         False         NaN      True
-TCK-000000002 USR-00000093   2025-03-07           email suggestion_quality P2_normal                   7                     162             54.53               1         False         NaN      True
-TCK-000000003 USR-00000158   2025-03-08     in_app_chat   indexing_failure    P3_low                   5                     495             93.06               0         False         4.0      True
-TCK-000000004 USR-00000032   2025-03-17 community_forum suggestion_quality P2_normal                   5                     180             43.31               0         False         5.0      True
-TCK-000000005 USR-00000026   2025-03-20     in_app_chat suggestion_quality   P1_high                   7                      33              4.23               0          True         NaN      True
+    ticket_id      user_id created_date     channel           category  priority  chat_message_count  first_response_minutes  resolution_hours  reopened_count  is_escalated  csat_score  resolved
+TCK-000000001 USR-00000782   2025-03-01       email        integration P2_normal                   4                     190             54.43               0         False         5.0      True
+TCK-000000002 USR-00000791   2025-03-01 in_app_chat suggestion_quality    P3_low                   4                     498             24.92               0         False         3.0      True
+TCK-000000003 USR-00001637   2025-03-01 in_app_chat            billing    P3_low                   4                     430             28.27               1         False         NaN      True
+TCK-000000004 USR-00001732   2025-03-01 in_app_chat suggestion_quality P2_normal                   2                     205             61.19               0         False         3.0      True
+TCK-000000005 USR-00002039   2025-03-01 in_app_chat suggestion_quality   P1_high                   1                      39             13.87               0         False         4.0      True
 ```
 
 <details><summary>dtypes</summary>
@@ -488,15 +488,15 @@ is_active_at_window_end              bool
 
 </details>
 
-### `crm_touches` — 1,098 rows
+### `crm_touches` — 289,382 rows
 
 ```text
-      touch_id campaign_id      user_id touch_date channel message_variant  delivered  opened  clicked               outcome  reactivated user_state_at_touch  cost_usd
-TCH-0000000001     CMP-003 USR-00000081 2025-04-03   email     C_incentive       True    True    False engaged_no_conversion        False              lapsed      0.04
-TCH-0000000002     CMP-003 USR-00000129 2025-04-03   email     C_incentive       True   False    False           no_response        False              lapsed      0.04
-TCH-0000000003     CMP-001 USR-00000163 2025-04-06   email     C_incentive       True   False    False           no_response        False             at_risk      0.04
-TCH-0000000004     CMP-001 USR-00000198 2025-04-06   email     C_incentive       True   False    False           no_response        False             at_risk      0.04
-TCH-0000000005     CMP-001 USR-00000167 2025-04-08   email  B_personalized       True   False    False           no_response        False             at_risk      0.04
+      touch_id campaign_id      user_id touch_date channel message_variant  delivered  opened  clicked     outcome  reactivated user_state_at_touch  cost_usd
+TCH-0000000001     CMP-001 USR-00000421 2025-04-01   email     C_incentive       True   False    False no_response        False             at_risk      0.04
+TCH-0000000002     CMP-001 USR-00000524 2025-04-01   email       A_control       True   False    False no_response        False             at_risk      0.04
+TCH-0000000003     CMP-001 USR-00001012 2025-04-01   email     C_incentive       True   False    False no_response        False             at_risk      0.04
+TCH-0000000004     CMP-001 USR-00001116 2025-04-01   email       A_control       True   False    False no_response        False             at_risk      0.04
+TCH-0000000005     CMP-001 USR-00001184 2025-04-01   email  B_personalized       True   False    False no_response        False             at_risk      0.04
 ```
 
 <details><summary>dtypes</summary>
@@ -519,15 +519,15 @@ cost_usd                      float64
 
 </details>
 
-### `churn_labels` — 2,257 rows
+### `churn_labels` — 571,848 rows
 
 ```text
 month_start      user_id  geo  churned churn_date  tenure_months  is_power_user_month  active_days  avg_coding_hours  avg_acceptance_rate  avg_session_frequency  coding_hours_trend_30d  support_tickets_30d  features_adopted  crm_touches_30d
- 2025-03-01 USR-00000001 APAC    False        NaT              3                False           18             1.847               0.4368                  3.833                     1.0                    0                 1                0
- 2025-03-01 USR-00000003   NA    False        NaT              5                False           20             3.828               0.3958                  2.900                     1.0                    0                 1                0
- 2025-03-01 USR-00000004 EMEA    False        NaT              5                False           11             1.328               0.3055                  2.545                     1.0                    0                 0                0
- 2025-03-01 USR-00000006 EMEA    False        NaT             20                False           22             5.087               0.3297                  6.545                     1.0                    0                 0                0
- 2025-03-01 USR-00000007   NA    False        NaT              8                False           22             3.961               0.3059                  6.409                     1.0                    0                 1                0
+ 2025-03-01 USR-00000001 APAC    False        NaT              8                False           18             1.847               0.4347                  4.167                     1.0                    0                 0                0
+ 2025-03-01 USR-00000003   NA    False        NaT             13                False           20             4.598               0.4041                  3.300                     1.0                    0                 1                0
+ 2025-03-01 USR-00000004 EMEA    False        NaT              5                False           11             1.666               0.2940                  2.636                     1.0                    0                 1                0
+ 2025-03-01 USR-00000006 EMEA    False        NaT             48                False           22             4.524               0.3199                  5.500                     1.0                    0                 1                0
+ 2025-03-01 USR-00000007   NA    False        NaT              8                False           22             4.714               0.3118                  6.545                     1.0                    0                 2                0
 ```
 
 <details><summary>dtypes</summary>
@@ -559,12 +559,12 @@ crm_touches_30d                    int64
 ```text
        users  power_users  at_risk_user_months  churn_events  monthly_churn_rate  avg_coding_hours  avg_acceptance_rate  avg_session_frequency  power_user_share
 geo                                                                                                                                                             
-NA        76           24                  862            38              0.0441            4.8072               0.3897                 4.5330            0.3158
-EMEA      62           21                  780            29              0.0372            4.5439               0.3705                 4.4408            0.3387
-APAC      35            6                  350            23              0.0657            4.4689               0.3850                 3.7437            0.1714
-ANZ       10            4                  131             6              0.0458            5.0353               0.4056                 4.5379            0.4000
-LATAM     10            2                  101             5              0.0495            4.8146               0.4043                 3.9364            0.2000
-MEA        7            2                   33             5              0.1515            6.1624               0.4400                 5.8625            0.2857
+NA     19174         4389               222984         10043              0.0450            4.2573               0.3794                 4.1866            0.2289
+EMEA   13012         2652               150493          6829              0.0454            4.0012               0.3674                 4.0666            0.2038
+APAC   10390         2680               120186          5461              0.0454            4.6276               0.4009                 4.4918            0.2579
+LATAM   3408          637                34775          2186              0.0629            4.0426               0.3684                 4.0124            0.1869
+MEA     2017          351                20060          1304              0.0650            3.8296               0.3581                 3.9111            0.1740
+ANZ     1999          437                23350          1053              0.0451            4.0741               0.3816                 4.1200            0.2186
 ```
 
 ### Per-month churn and engagement
@@ -572,38 +572,38 @@ MEA        7            2                   33             5              0.1515
 ```text
              at_risk_users  churn_events  monthly_churn_rate  avg_coding_hours  avg_acceptance_rate  avg_session_frequency  power_user_months
 month_start                                                                                                                                  
-2025-03-01             131             9              0.0687            3.6277               0.3462                 3.6227                 26
-2025-04-01             122             3              0.0246            3.8332               0.3495                 3.6706                 23
-2025-05-01             123             6              0.0488            3.8105               0.3480                 3.5459                 26
-2025-06-01             123             9              0.0732            3.9117               0.3512                 3.7031                 32
-2025-07-01             120             8              0.0667            3.8488               0.3489                 3.6833                 24
-2025-08-01             124            10              0.0806            4.0719               0.3527                 3.8537                 32
-2025-09-01             127             4              0.0315            4.5630               0.3707                 4.2746                 46
-2025-10-01             132             6              0.0455            4.6604               0.3759                 4.3808                 56
-2025-11-01             134             3              0.0224            4.6067               0.3785                 4.3014                 50
-2025-12-01             136            10              0.0735            4.3502               0.3619                 4.1621                 46
-2026-01-01             128             7              0.0547            5.0499               0.3988                 4.7126                 56
-2026-02-01             128             2              0.0156            5.2036               0.4073                 4.8140                 55
-2026-03-01             129             4              0.0310            5.3496               0.4192                 4.9075                 64
-2026-04-01             129             6              0.0465            5.3550               0.4173                 4.9742                 56
-2026-05-01             125             6              0.0480            5.3825               0.4214                 4.8703                 55
-2026-06-01             119             4              0.0336            5.5573               0.4215                 5.0094                 64
-2026-07-01             115             4              0.0348            5.7603               0.4303                 5.1640                 59
-2026-08-01             112             5              0.0446            5.7899               0.4333                 5.1489                 56
+2025-03-01           35958          1999              0.0556            3.6060               0.3508                 3.6931               7483
+2025-04-01           34571          1976              0.0572            3.6313               0.3494                 3.7448               6642
+2025-05-01           33697          1922              0.0570            3.6373               0.3491                 3.7396               6695
+2025-06-01           33262          2113              0.0635            3.5544               0.3452                 3.6799               6882
+2025-07-01           32839          2025              0.0617            3.5570               0.3448                 3.7031               6128
+2025-08-01           32556          1929              0.0593            3.6317               0.3501                 3.7405               6794
+2025-09-01           32391          1398              0.0432            4.0757               0.3679                 4.0806               9489
+2025-10-01           32622          1397              0.0428            4.2388               0.3755                 4.2035               9701
+2025-11-01           32681          1398              0.0428            4.1551               0.3748                 4.1101               9610
+2025-12-01           32535          2002              0.0615            3.9062               0.3626                 3.9733               8721
+2026-01-01           31624          1341              0.0424            4.4355               0.3880                 4.3421              10328
+2026-02-01           31291          1230              0.0393            4.6431               0.3984                 4.5060              11059
+2026-03-01           30829           951              0.0308            4.8122               0.4077                 4.6244              12001
+2026-04-01           30522          1146              0.0375            4.8645               0.4104                 4.6817              11547
+2026-05-01           29816          1063              0.0357            4.9274               0.4168                 4.7082              11568
+2026-06-01           29090          1082              0.0372            4.9613               0.4178                 4.7664              11665
+2026-07-01           28223          1016              0.0360            5.0154               0.4213                 4.8162              11041
+2026-08-01           27341           888              0.0325            5.1488               0.4318                 4.8972              11280
 ```
 
 ### `usage_events` numeric distributions (the A06 behavioural signal)
 
 ```text
-       coding_hours  ai_suggestion_acceptance_rate  session_frequency  suggestions_shown  suggestions_accepted  lines_of_code_written  files_touched  ai_requests
-count   43,514.0000                    43,514.0000        43,514.0000        43,514.0000           43,514.0000            43,514.0000    43,514.0000  43,514.0000
-mean         5.3211                         0.4098             4.8617           180.8768               82.2896               330.0294        23.4080      16.4951
-std          3.8911                         0.1381             3.3443           132.9444               77.8976               241.9262        17.7647      12.7544
-min          0.1150                         0.0000             1.0000             1.0000                0.0000                 5.0000         1.0000       0.0000
-25%          2.3940                         0.3158             2.0000            81.0000               27.0000               148.0000        10.0000       7.0000
-50%          4.2260                         0.4085             4.0000           144.0000               57.0000               263.0000        19.0000      13.0000
-75%          7.1650                         0.5000             7.0000           243.7500              110.0000               445.0000        32.0000      22.0000
-max         16.0000                         0.9208            24.0000           625.0000              523.0000             1,109.0000        99.0000      76.0000
+         coding_hours  ai_suggestion_acceptance_rate  session_frequency  suggestions_shown  suggestions_accepted  lines_of_code_written   files_touched     ai_requests
+count 10,778,146.0000                10,778,146.0000    10,778,146.0000    10,778,146.0000       10,778,146.0000        10,778,146.0000 10,778,146.0000 10,778,146.0000
+mean           4.7703                         0.4054             4.6555           162.1914               73.4957               295.7613         20.9921         14.7870
+std            3.5103                         0.1398             3.3024           120.0275               71.8945               218.3151         16.1035         11.5412
+min            0.0500                         0.0000             1.0000             1.0000                0.0000                 0.0000          1.0000          0.0000
+25%            2.2220                         0.3115             2.0000            75.0000               25.0000               137.0000          9.0000          6.0000
+50%            3.7860                         0.4023             4.0000           129.0000               50.0000               235.0000         17.0000         12.0000
+75%            6.2690                         0.4951             6.0000           214.0000               96.0000               389.0000         28.0000         20.0000
+max           16.0000                         1.0000            40.0000           656.0000              599.0000             1,134.0000        111.0000         85.0000
 ```
 
 ### `users` categorical distributions
@@ -611,26 +611,26 @@ max         16.0000                         0.9208            24.0000           
 ```text
        users
 geo         
-NA        76
-EMEA      62
-APAC      35
-LATAM     10
-ANZ       10
-MEA        7
+NA     19174
+EMEA   13012
+APAC   10390
+LATAM   3408
+MEA     2017
+ANZ     1999
 
                  users
 persona               
-individual_dev      81
-team_lead           36
-student             29
-freelancer          28
-startup_founder     26
+individual_dev   21788
+team_lead         9568
+freelancer        7132
+startup_founder   5958
+student           5554
 
                   users
 plan                   
-pro_monthly         139
-pro_annual           41
-pro_team_monthly     20
+pro_monthly       34034
+pro_annual        11944
+pro_team_monthly   4022
 ```
 
 ### `subscriptions` (A03) lifecycle mix
@@ -638,37 +638,37 @@ pro_team_monthly     20
 ```text
                             terms
 status                           
-active                        107
-canceled                       97
-churned_after_reactivation      9
-downgraded                      7
+active                      26568
+canceled                    24747
+churned_after_reactivation   2129
+downgraded                   1113
 
                            cancellations
 cancel_reason                           
-stopped_using                         39
-too_expensive                         29
-missing_features                      14
-switched_competitor                   11
-quality_of_suggestions                 7
-other                                  3
-employer_provided_license              3
+stopped_using                       8300
+too_expensive                       5853
+switched_competitor                 4347
+missing_features                    3293
+quality_of_suggestions              2715
+employer_provided_license           1614
+other                                754
 
-total recognised revenue in window: $49,073.98
-terms per user: 1.100
-downgrade terms: 7   reactivation terms: 13
+total recognised revenue in window: $11,823,529.24
+terms per user: 1.091
+downgrade terms: 1,113   reactivation terms: 3,444
 ```
 
 ### `feature_adoption` (A07) stickiness features
 
 ```text
-                 rows  adoption_rate  avg_activations  avg_depth
-feature_key                                                     
-agent_mode       2270         0.3982          10.4674     0.2146
-codebase_chat    2270         0.6035          47.0599     0.4041
-multi_file_edit  2270         0.3762           7.3586     0.1996
-project_rules    2270         0.1894           0.9652     0.0849
-tab_completion   2270         0.7493         265.3793     0.5752
-terminal_ai      2270         0.2687           8.3833     0.1350
+                   rows  adoption_rate  avg_activations  avg_depth
+feature_key                                                       
+agent_mode       575292         0.3603           9.0516     0.1939
+codebase_chat    575292         0.5576          42.7031     0.3724
+multi_file_edit  575292         0.3299           6.0106     0.1716
+project_rules    575292         0.1962           1.0246     0.0871
+tab_completion   575292         0.7196         250.9267     0.5551
+terminal_ai      575292         0.2894           8.7197     0.1439
 ```
 
 ### `support_tickets` (A14) volume, chat volume and CSAT
@@ -676,48 +676,48 @@ terminal_ai      2270         0.2687           8.3833     0.1350
 ```text
                  tickets  avg_chat_messages  avg_csat  escalation_rate
 channel                                                               
-community_forum       26             6.8846    4.0588           0.1538
-email                 72             6.5000    4.1053           0.0694
-in_app_chat          103             6.6214    3.8254           0.1165
-phone                 22             6.8636    4.0909           0.0909
+community_forum     8379             2.4830    3.9612           0.1094
+email              21295             2.4953    3.9694           0.1127
+in_app_chat        29062             2.5002    3.9630           0.1112
+phone               4365             2.5480    3.9533           0.1081
 
                      tickets  avg_csat
 category                              
-account_login             27    4.2500
-billing                   37    3.6471
-feature_request           24    3.8824
-indexing_failure          33    4.1667
-integration               15    3.8182
-performance_latency       42    3.8095
-suggestion_quality        45    4.0690
+account_login           6964    3.9578
+billing                10102    3.9446
+feature_request         6280    3.9640
+indexing_failure        8880    3.9791
+integration             3805    3.9427
+performance_latency    11917    3.9636
+suggestion_quality     15153    3.9774
 
-overall mean CSAT: 3.9612 (response rate 57.85%)
-total chat messages: 1,480
+overall mean CSAT: 3.9643 (response rate 57.77%)
+total chat messages: 157,725
 ```
 
 ### `crm_touches` by campaign, outcome and user state at touch
 
 ```text
-             touches  delivered_rate  open_rate  click_rate  reactivation_rate  cost_usd
-campaign_id                                                                             
-CMP-001          320          0.9812     0.3375      0.1062             0.0000   12.8000
-CMP-002           33          1.0000     0.6970      0.2121             0.0000    0.3300
-CMP-003          171          0.9415     0.3567      0.1111             0.0760    6.8400
-CMP-004          321          1.0000     0.6168      0.2741             0.0000    3.2100
-CMP-005          253          0.8617     0.3360      0.0672             0.0000    5.0600
+             touches  delivered_rate  open_rate  click_rate  reactivation_rate   cost_usd
+campaign_id                                                                              
+CMP-001        82793          0.9600     0.3261      0.0923             0.0000 3,311.7200
+CMP-002         6392          0.9953     0.6173      0.2664             0.0000    63.9200
+CMP-003        44875          0.9602     0.3752      0.1606             0.0767 1,795.0000
+CMP-004        96895          0.9951     0.6139      0.2724             0.0000   968.9500
+CMP-005        58427          0.8803     0.3609      0.0774             0.0000 1,168.5400
 
                        touches
 outcome                       
-no_response                613
-engaged_no_conversion      456
-unsubscribed                16
-reactivated                 13
+no_response             159116
+engaged_no_conversion   123348
+unsubscribed              3474
+reactivated               3444
 
                      touches
 user_state_at_touch         
-active                   489
-at_risk                  438
-lapsed                   171
+active                131757
+at_risk               112750
+lapsed                 44875
 ```
 
 ### `crm_campaigns`
@@ -741,8 +741,8 @@ users who eventually churned against users who were retained.
 ```text
           users  avg_coding_hours  avg_acceptance_rate  avg_session_frequency  avg_active_days  avg_coding_hours_trend  avg_support_tickets
 cohort                                                                                                                                     
-retained    103            6.1949               0.4486                 5.4695          21.4531                  1.0011               0.1197
-churned      97            1.9548               0.2750                 2.5216          11.3440                  0.9703               0.1680
+retained  25253            5.3602               0.4387                 5.0731          20.5744                  1.0013               0.1112
+churned   24747            2.1222               0.2752                 2.5614          11.7108                  0.9551               0.1753
 ```
 
 ### Monthly churn rate by coding-hours trend bucket
@@ -754,12 +754,12 @@ The highest `>1.25 (surging)` bucket is *not* the lowest-churn group, and that i
 ```text
                              user_months  churn_rate  avg_coding_hours  avg_acceptance_rate  avg_session_frequency
 trend_bucket                                                                                                      
-<=0.50 (collapsing)                    8      0.6250            0.4489               0.1544                 1.1952
-0.50-0.75 (steep decline)            140      0.1000            2.4379               0.3150                 2.9587
-0.75-0.90 (declining)                469      0.0533            3.8875               0.3644                 4.0260
-0.90-1.00 (flat/slight dip)          563      0.0426            4.8544               0.3928                 4.5152
-1.00-1.25 (growing)                  862      0.0290            5.3705               0.4034                 4.7143
->1.25 (surging)                      215      0.0605            4.9811               0.3862                 4.4153
+<=0.50 (collapsing)                 2300      0.7913            0.4732               0.1085                 0.9416
+0.50-0.75 (steep decline)          39282      0.1097            2.4075               0.3073                 3.0151
+0.75-0.90 (declining)             117600      0.0480            3.5693               0.3605                 3.8767
+0.90-1.00 (flat/slight dip)       152021      0.0387            4.2633               0.3831                 4.2605
+1.00-1.25 (growing)               203153      0.0308            4.8879               0.4032                 4.5999
+>1.25 (surging)                    57492      0.0516            4.5859               0.3846                 4.1904
 ```
 
 ### Pearson correlation of each behavioural feature with the churn label
@@ -768,14 +768,14 @@ Negative = higher values of the feature go with *less* churn.
 
 ```text
                         pearson_r_with_churned
-avg_coding_hours                       -0.2035
-avg_acceptance_rate                    -0.2144
-avg_session_frequency                  -0.1708
-coding_hours_trend_30d                 -0.0541
-active_days                            -0.4214
-support_tickets_30d                     0.1016
-features_adopted                       -0.0957
-tenure_months                          -0.0226
+avg_coding_hours                       -0.1890
+avg_acceptance_rate                    -0.2155
+avg_session_frequency                  -0.1665
+coding_hours_trend_30d                 -0.0953
+active_days                            -0.4273
+support_tickets_30d                     0.0641
+features_adopted                       -0.0898
+tenure_months                          -0.0392
 ```
 
 ## 8. Internal consistency checks
@@ -803,7 +803,7 @@ usage_events value ranges plausible: OK
 monthly churn rate 0.0470 within +/-0.5pt of target 0.0470: OK
 no usage_events after cancellation (non-reactivated users): OK
 support_tickets.created_date inside an active subscription term: OK
-reactivated touches (13) == reactivation terms (13): OK
+reactivated touches (3444) == reactivation terms (3444): OK
 reactivations per user <= MAX_REACTIVATIONS (1); observed max 1: OK
 churn_labels.churn_date set whenever churned: OK
 ```
@@ -826,14 +826,14 @@ window is anchored to a fixed `end_date` (default
 ### 9a. Canonical content digests (the guaranteed invariant)
 
 ```text
-churn_labels         d37f134c19ccd6eca833eb8053c21be30a76788ee0e3a896a8f8a01fd4a75679
+churn_labels         6b073b863aa95bc707d516df6c044727a3ae0dae074efbf91219c93b2f707396
 crm_campaigns        24a031ae365c958ae66b44d066a077fa0177b5a3dcc36487fa7dd1b3e25473ca
-crm_touches          281fb13236b94f9221f35475b40f861d42b58962d798c25d0401b4d43e51b267
-feature_adoption     aac908cce9914ca793191b8d926e08298ca77ec5febad52ab113731da3f402b8
-subscriptions        0b0931cc7b28050111bd74eda91f44d0162ec3dace1863c26923065d5b03a8f9
-support_tickets      1da136be8f0634251cb6c73baf0da8f9ed71e08a83d3483114df60739e28e196
-usage_events         221d72cdba117e482c97e2784b891492beefd909659922f0fe7ddb6ff8ad5bc6
-users                9e82fa0fc0410c3a5b5f2b3a54644ecbe5afd9fb22084404f8196b08b3cf9699
+crm_touches          9829cc4d58c6eeade86f9903980615b80f61eb27cdb962673161bd67903b3954
+feature_adoption     fe9ac946f06d8d49a0ac1eab497887a96efc1edcd5012a8e606033a443187409
+subscriptions        723784b072ff962b50a7b0bb967877f59e1d5517b79322a940b62c829a82f659
+support_tickets      0e8464f3d6f1292ce59803357c769b484b36bc3f541c90b821b28c3a9685f2a7
+usage_events         26764634c6ffcf76640f8416537da463c8fdec2f924fa5585337fc0e5ade90cd
+users                bf62382a8f43b3249f558e2e140026d64a747306ba9e4df9434bf1248631d5cf
 ```
 
 ### 9b. Emitted Parquet file digests (verified across two runs)
@@ -849,35 +849,14 @@ identical. Treat 9b/9c as "the generator adds no nondeterminism of its
 own, in a pinned environment"; treat 9a as the claim that always holds.
 
 ```text
-users/part-00000.parquet                 c662643ba1abcbb3c06f8016bf6b7169f5e9b2ae7f2d3d0364c2f048f979f0d8
-subscriptions/part-00000.parquet         501ccf574122c0e9ccdbfc6e8ce19ef8f9479f9e1600ea6596154642d26caac9
-usage_events/part-00000.parquet          e53cc20e63f4015c7baa25d305d3030d71bbf00a223ecc5e0f1a0c17e601dce0
-feature_adoption/part-00000.parquet      bab01582295c173aa7add050d329aa4962c8a91be7fe270bfa68a212bb2a403e
-support_tickets/part-00000.parquet       1619b672b8c63e0b1f26aca8c124ba986e6cf07fba0b2a005ab1280fdc5ac0f8
+users/part-00000.parquet                 5843e40bd2d410b59684f527ce612511028798a1d56e99cd5408ab17fb5fc740
+subscriptions/part-00000.parquet         50a7000628abbbe2f28882aad5de521c78f658b035670c711eaa6c5a868a5ae1
+usage_events/part-00000.parquet          de7783ec3bf261e558bf5ba7ab01182194cb209ec26946fce1e1ce684d52a45a
+feature_adoption/part-00000.parquet      086a3be800d070ecab7a9b8acefa544dca549f66a83ccb9c9a79147d176de08f
+support_tickets/part-00000.parquet       8268eb7557c433c9124cf71b6dd463150eec37aec30e03d3348f552ca5276cba
 crm_campaigns/part-00000.parquet         1e3eb2239eb0cfeeeba89f2e962ee514086dd4d19606dcf974ddfb2c4ce906c6
-crm_touches/part-00000.parquet           77626f6ea673638d9ddb65c77e3865474db4cdd90a3c3c510bb65045ba1d39dc
-churn_labels/part-00000.parquet          3daba07defbbf056fce2a3c678d62b8005114493f81fb81f17189dd6e523e338
-```
-
-## 9c. Two-run reproducibility check (committed proof)
-
-The generator was executed a second time with the same seed and config into a separate output directory, and both the canonical content digests and the emitted Parquet bytes were compared. Result:
-
-```text
-run 1 output dir            : data/sample
-run 2 output dir            : <temporary directory, removed after comparison>
-tables compared             : 8
-content digests match       : True
-parquet files compared      : 8
-parquet byte digests match  : True
-
-combined SHA-256 over all canonical content digests:
-  run 1: 44d157a1f647111b9c4dd69c572c8610cd6dc32905da6bbbea4736ba336056bf
-  run 2: 44d157a1f647111b9c4dd69c572c8610cd6dc32905da6bbbea4736ba336056bf
-
-combined SHA-256 over all emitted Parquet file digests:
-  run 1: 4108d2c00408717848bcf7a14b06c8aa386a7ff854b283da9d1f651ca5655e0f
-  run 2: 4108d2c00408717848bcf7a14b06c8aa386a7ff854b283da9d1f651ca5655e0f
+crm_touches/part-00000.parquet           782ad6c875554f109591d12c4ecd05978ec48cbc00399ab1915e626bba1f7b39
+churn_labels/part-00000.parquet          058f7416d9340d8c2e6660eae6835ae85dd517e7c2e5387ec8627524e8dbf01d
 ```
 
 ## 10. Output manifest (`_manifest.json`)
@@ -890,8 +869,8 @@ Written alongside the data. This is the handoff contract to the Lakeflow ingest 
   "config": {
     "seed": 1729,
     "users_requested": 50000,
-    "sample_frac": 0.004,
-    "users_effective": 200,
+    "sample_frac": 1.0,
+    "users_effective": 50000,
     "months": 18,
     "window_start": "2025-03-01",
     "window_end": "2026-08-31",
@@ -902,7 +881,7 @@ Written alongside the data. This is the handoff contract to the Lakeflow ingest 
     "campaigns": 5,
     "output_format": "parquet",
     "partitioned": false,
-    "out_dir": "data/sample"
+    "out_dir": "/tmp/fullrun"
   },
   "unity_catalog": {
     "catalog": "dev_behavior",
@@ -917,7 +896,7 @@ Written alongside the data. This is the handoff contract to the Lakeflow ingest 
       "asset": "VA (identity / persona / entitlements)",
       "layer": "bronze",
       "grain": "one row per Pro-tier user",
-      "rows": 200,
+      "rows": 50000,
       "columns": [
         "user_id",
         "signup_date",
@@ -940,14 +919,14 @@ Written alongside the data. This is the handoff contract to the Lakeflow ingest 
       "files": [
         "users/part-00000.parquet"
       ],
-      "bytes": 12763
+      "bytes": 678126
     },
     {
       "table": "subscriptions",
       "asset": "A03 \u2014 subscription plans & billing history",
       "layer": "bronze",
       "grain": "one row per subscription term (a plan a user held for a period)",
-      "rows": 220,
+      "rows": 54557,
       "columns": [
         "subscription_id",
         "user_id",
@@ -974,14 +953,14 @@ Written alongside the data. This is the handoff contract to the Lakeflow ingest 
       "files": [
         "subscriptions/part-00000.parquet"
       ],
-      "bytes": 19920
+      "bytes": 1164691
     },
     {
       "table": "usage_events",
       "asset": "A06 \u2014 raw product usage events & telemetry",
       "layer": "bronze",
       "grain": "one row per user per ACTIVE day (inactive days are not emitted)",
-      "rows": 43514,
+      "rows": 10778146,
       "columns": [
         "event_date",
         "user_id",
@@ -1003,14 +982,14 @@ Written alongside the data. This is the handoff contract to the Lakeflow ingest 
       "files": [
         "usage_events/part-00000.parquet"
       ],
-      "bytes": 562824
+      "bytes": 132670475
     },
     {
       "table": "feature_adoption",
       "asset": "A07 \u2014 feature adoption & activation metrics",
       "layer": "bronze",
       "grain": "one row per user per feature per month",
-      "rows": 13620,
+      "rows": 3451752,
       "columns": [
         "month_start",
         "user_id",
@@ -1030,14 +1009,14 @@ Written alongside the data. This is the handoff contract to the Lakeflow ingest 
       "files": [
         "feature_adoption/part-00000.parquet"
       ],
-      "bytes": 53258
+      "bytes": 14220701
     },
     {
       "table": "support_tickets",
       "asset": "A14 \u2014 support tickets, chat logs & CSAT",
       "layer": "bronze",
       "grain": "one row per support ticket",
-      "rows": 223,
+      "rows": 63101,
       "columns": [
         "ticket_id",
         "user_id",
@@ -1058,7 +1037,7 @@ Written alongside the data. This is the handoff contract to the Lakeflow ingest 
       "files": [
         "support_tickets/part-00000.parquet"
       ],
-      "bytes": 14742
+      "bytes": 1109475
     },
     {
       "table": "crm_campaigns",
@@ -1090,7 +1069,7 @@ Written alongside the data. This is the handoff contract to the Lakeflow ingest 
       "asset": "VA (CRM touch + reactivation outcome)",
       "layer": "bronze",
       "grain": "one row per campaign touch sent to a user",
-      "rows": 1098,
+      "rows": 289382,
       "columns": [
         "touch_id",
         "campaign_id",
@@ -1113,14 +1092,14 @@ Written alongside the data. This is the handoff contract to the Lakeflow ingest 
       "files": [
         "crm_touches/part-00000.parquet"
       ],
-      "bytes": 23856
+      "bytes": 2698943
     },
     {
       "table": "churn_labels",
       "asset": "derived label (gold) \u2014 supervised training target",
       "layer": "gold",
       "grain": "one row per user per month the user was a subscriber at month start",
-      "rows": 2257,
+      "rows": 571848,
       "columns": [
         "month_start",
         "user_id",
@@ -1145,10 +1124,10 @@ Written alongside the data. This is the handoff contract to the Lakeflow ingest 
       "files": [
         "churn_labels/part-00000.parquet"
       ],
-      "bytes": 68392
+      "bytes": 7026369
     }
   ],
-  "total_rows": 61137
+  "total_rows": 15258791
 }
 ```
 
@@ -1165,98 +1144,73 @@ Written alongside the data. This is the handoff contract to the Lakeflow ingest 
 
 | Stage | Wall clock |
 | --- | --- |
-| population | 0.005 |
-| lifecycle | 0.141 |
-| usage_events | 0.056 |
-| users | 0.001 |
-| subscriptions | 0.019 |
-| feature_adoption | 0.018 |
-| support_tickets | 0.005 |
-| crm_campaigns | 0.001 |
-| crm_touches | 0.004 |
-| churn_labels | 0.007 |
-| conform | 0.099 |
+| population | 0.324 |
+| lifecycle | 9.882 |
+| usage_events | 16.299 |
+| users | 0.026 |
+| subscriptions | 4.146 |
+| feature_adoption | 5.097 |
+| support_tickets | 0.139 |
+| crm_campaigns | 0.002 |
+| crm_touches | 0.405 |
+| churn_labels | 1.291 |
+| conform | 13.546 |
 
 ### Console log
 
 Captured verbatim from the generator's stderr logger. Timestamps are wall-clock and therefore differ per run.
 
 ```console
-2026-09-08 19:56:36,494 INFO    datagen | datagen starting | seed=1729 users_requested=50000 sample_frac=0.004 users_effective=200 months=18 window_start=2025-03-01 window_end=2026-08-31 days=549 target_monthly_churn_rate=0.047 target_reactivation_rate=0.08 power_user_bar=>=4.0 coding hours/day on >=5 days/week campaigns=5 output_format=parquet partitioned=False out_dir=data/sample
-2026-09-08 19:56:36,494 INFO    datagen | building population: 200 users, 18 months (2025-03-01 .. 2026-08-31)
-2026-09-08 19:56:36,499 INFO    datagen | simulating subscription lifecycle + CRM (calibrating churn hazard)
-2026-09-08 19:56:36,641 INFO    datagen | hazard intercept calibrated to -2.20312 in 10 iterations -> monthly churn 0.0470 (target 0.0470)
-2026-09-08 19:56:36,641 INFO    datagen | generating usage_events (active days only)
-2026-09-08 19:56:36,696 INFO    datagen | usage_events: 43,514 rows
-2026-09-08 19:56:36,851 INFO    datagen | users                     200 rows
-2026-09-08 19:56:36,851 INFO    datagen | subscriptions             220 rows
-2026-09-08 19:56:36,851 INFO    datagen | usage_events           43,514 rows
-2026-09-08 19:56:36,851 INFO    datagen | feature_adoption       13,620 rows
-2026-09-08 19:56:36,851 INFO    datagen | support_tickets           223 rows
-2026-09-08 19:56:36,851 INFO    datagen | crm_campaigns               5 rows
-2026-09-08 19:56:36,851 INFO    datagen | crm_touches             1,098 rows
-2026-09-08 19:56:36,851 INFO    datagen | churn_labels            2,257 rows
-2026-09-08 19:56:36,886 INFO    datagen.writer | wrote users                     200 rows -> 1 file(s)
-2026-09-08 19:56:36,889 INFO    datagen.writer | wrote subscriptions             220 rows -> 1 file(s)
-2026-09-08 19:56:36,913 INFO    datagen.writer | wrote usage_events           43,514 rows -> 1 file(s)
-2026-09-08 19:56:36,928 INFO    datagen.writer | wrote feature_adoption       13,620 rows -> 1 file(s)
-2026-09-08 19:56:36,931 INFO    datagen.writer | wrote support_tickets           223 rows -> 1 file(s)
-2026-09-08 19:56:36,932 INFO    datagen.writer | wrote crm_campaigns               5 rows -> 1 file(s)
-2026-09-08 19:56:36,936 INFO    datagen.writer | wrote crm_touches             1,098 rows -> 1 file(s)
-2026-09-08 19:56:36,942 INFO    datagen.writer | wrote churn_labels            2,257 rows -> 1 file(s)
-2026-09-08 19:56:36,943 INFO    datagen.writer | wrote manifest -> data/sample/_manifest.json
-2026-09-08 19:56:36,943 INFO    datagen.writer | wrote Unity Catalog DDL -> data/sample/_unity_catalog.sql
-2026-09-08 19:56:36,974 INFO    datagen | check: referential integrity subscriptions.user_id -> users.user_id: OK
-2026-09-08 19:56:36,974 INFO    datagen | check: referential integrity usage_events.user_id -> users.user_id: OK
-2026-09-08 19:56:36,974 INFO    datagen | check: referential integrity feature_adoption.user_id -> users.user_id: OK
-2026-09-08 19:56:36,974 INFO    datagen | check: referential integrity support_tickets.user_id -> users.user_id: OK
-2026-09-08 19:56:36,974 INFO    datagen | check: referential integrity crm_touches.user_id -> users.user_id: OK
-2026-09-08 19:56:36,974 INFO    datagen | check: referential integrity churn_labels.user_id -> users.user_id: OK
-2026-09-08 19:56:36,974 INFO    datagen | check: referential integrity crm_touches.campaign_id -> crm_campaigns.campaign_id: OK
-2026-09-08 19:56:36,974 INFO    datagen | check: primary key users(user_id): OK
-2026-09-08 19:56:36,974 INFO    datagen | check: primary key subscriptions(subscription_id): OK
-2026-09-08 19:56:36,974 INFO    datagen | check: primary key usage_events(user_id, event_date): OK
-2026-09-08 19:56:36,974 INFO    datagen | check: primary key feature_adoption(user_id, feature_key, month_start): OK
-2026-09-08 19:56:36,974 INFO    datagen | check: primary key support_tickets(ticket_id): OK
-2026-09-08 19:56:36,974 INFO    datagen | check: primary key crm_campaigns(campaign_id): OK
-2026-09-08 19:56:36,974 INFO    datagen | check: primary key crm_touches(touch_id): OK
-2026-09-08 19:56:36,974 INFO    datagen | check: primary key churn_labels(user_id, month_start): OK
-2026-09-08 19:56:36,974 INFO    datagen | check: usage_events.event_date within window: OK
-2026-09-08 19:56:36,975 INFO    datagen | check: usage_events value ranges plausible: OK
-2026-09-08 19:56:36,975 INFO    datagen | check: monthly churn rate 0.0470 within +/-0.5pt of target 0.0470: OK
-2026-09-08 19:56:36,975 INFO    datagen | check: no usage_events after cancellation (non-reactivated users): OK
-2026-09-08 19:56:36,975 INFO    datagen | check: support_tickets.created_date inside an active subscription term: OK
-2026-09-08 19:56:36,975 INFO    datagen | check: reactivated touches (13) == reactivation terms (13): OK
-2026-09-08 19:56:36,975 INFO    datagen | check: reactivations per user <= MAX_REACTIVATIONS (1); observed max 1: OK
-2026-09-08 19:56:36,975 INFO    datagen | check: churn_labels.churn_date set whenever churned: OK
-2026-09-08 19:56:36,975 INFO    datagen | monthly churn rate: 0.0470 (target 0.0470) | users 200 | usage_events 43,514 rows
-2026-09-08 19:56:36,975 INFO    datagen | churn detail: 106 churn events / 2257 at-risk user-months = 0.046965
-2026-09-08 19:56:36,975 INFO    datagen | datagen finished | total rows 61,137
-2026-09-08 19:56:36,978 INFO    datagen | verifying reproducibility: regenerating into a temporary directory
-2026-09-08 19:56:37,292 INFO    datagen | building population: 200 users, 18 months (2025-03-01 .. 2026-08-31)
-2026-09-08 19:56:37,296 INFO    datagen | simulating subscription lifecycle + CRM (calibrating churn hazard)
-2026-09-08 19:56:37,437 INFO    datagen | hazard intercept calibrated to -2.20312 in 10 iterations -> monthly churn 0.0470 (target 0.0470)
-2026-09-08 19:56:37,438 INFO    datagen | generating usage_events (active days only)
-2026-09-08 19:56:37,491 INFO    datagen | usage_events: 43,514 rows
-2026-09-08 19:56:37,646 INFO    datagen | users                     200 rows
-2026-09-08 19:56:37,646 INFO    datagen | subscriptions             220 rows
-2026-09-08 19:56:37,647 INFO    datagen | usage_events           43,514 rows
-2026-09-08 19:56:37,647 INFO    datagen | feature_adoption       13,620 rows
-2026-09-08 19:56:37,647 INFO    datagen | support_tickets           223 rows
-2026-09-08 19:56:37,647 INFO    datagen | crm_campaigns               5 rows
-2026-09-08 19:56:37,647 INFO    datagen | crm_touches             1,098 rows
-2026-09-08 19:56:37,647 INFO    datagen | churn_labels            2,257 rows
-2026-09-08 19:56:37,964 INFO    datagen.writer | wrote users                     200 rows -> 1 file(s)
-2026-09-08 19:56:37,967 INFO    datagen.writer | wrote subscriptions             220 rows -> 1 file(s)
-2026-09-08 19:56:37,991 INFO    datagen.writer | wrote usage_events           43,514 rows -> 1 file(s)
-2026-09-08 19:56:38,007 INFO    datagen.writer | wrote feature_adoption       13,620 rows -> 1 file(s)
-2026-09-08 19:56:38,010 INFO    datagen.writer | wrote support_tickets           223 rows -> 1 file(s)
-2026-09-08 19:56:38,012 INFO    datagen.writer | wrote crm_campaigns               5 rows -> 1 file(s)
-2026-09-08 19:56:38,016 INFO    datagen.writer | wrote crm_touches             1,098 rows -> 1 file(s)
-2026-09-08 19:56:38,022 INFO    datagen.writer | wrote churn_labels            2,257 rows -> 1 file(s)
-2026-09-08 19:56:38,023 INFO    datagen.writer | wrote manifest -> /tmp/datagen-verify-88ukj562/_manifest.json
-2026-09-08 19:56:38,024 INFO    datagen.writer | wrote Unity Catalog DDL -> /tmp/datagen-verify-88ukj562/_unity_catalog.sql
-2026-09-08 19:56:38,029 INFO    datagen | reproducibility: content digests MATCH | parquet byte digests MATCH
+2026-09-08 19:50:36,235 INFO    datagen | datagen starting | seed=1729 users_requested=50000 sample_frac=1.0 users_effective=50000 months=18 window_start=2025-03-01 window_end=2026-08-31 days=549 target_monthly_churn_rate=0.047 target_reactivation_rate=0.08 power_user_bar=>=4.0 coding hours/day on >=5 days/week campaigns=5 output_format=parquet partitioned=False out_dir=/tmp/fullrun
+2026-09-08 19:50:36,236 INFO    datagen | building population: 50000 users, 18 months (2025-03-01 .. 2026-08-31)
+2026-09-08 19:50:36,559 INFO    datagen | simulating subscription lifecycle + CRM (calibrating churn hazard)
+2026-09-08 19:50:46,442 INFO    datagen | hazard intercept calibrated to -2.21875 in 9 iterations -> monthly churn 0.0470 (target 0.0470)
+2026-09-08 19:50:46,442 INFO    datagen | generating usage_events (active days only)
+2026-09-08 19:51:02,741 INFO    datagen | usage_events: 10,778,146 rows
+2026-09-08 19:51:27,394 INFO    datagen | users                  50,000 rows
+2026-09-08 19:51:27,395 INFO    datagen | subscriptions          54,557 rows
+2026-09-08 19:51:27,395 INFO    datagen | usage_events       10,778,146 rows
+2026-09-08 19:51:27,395 INFO    datagen | feature_adoption    3,451,752 rows
+2026-09-08 19:51:27,395 INFO    datagen | support_tickets        63,101 rows
+2026-09-08 19:51:27,395 INFO    datagen | crm_campaigns               5 rows
+2026-09-08 19:51:27,395 INFO    datagen | crm_touches           289,382 rows
+2026-09-08 19:51:27,395 INFO    datagen | churn_labels          571,848 rows
+2026-09-08 19:51:27,496 INFO    datagen.writer | wrote users                  50,000 rows -> 1 file(s)
+2026-09-08 19:51:27,565 INFO    datagen.writer | wrote subscriptions          54,557 rows -> 1 file(s)
+2026-09-08 19:51:31,673 INFO    datagen.writer | wrote usage_events       10,778,146 rows -> 1 file(s)
+2026-09-08 19:51:34,896 INFO    datagen.writer | wrote feature_adoption    3,451,752 rows -> 1 file(s)
+2026-09-08 19:51:34,957 INFO    datagen.writer | wrote support_tickets        63,101 rows -> 1 file(s)
+2026-09-08 19:51:34,959 INFO    datagen.writer | wrote crm_campaigns               5 rows -> 1 file(s)
+2026-09-08 19:51:35,272 INFO    datagen.writer | wrote crm_touches           289,382 rows -> 1 file(s)
+2026-09-08 19:51:35,514 INFO    datagen.writer | wrote churn_labels          571,848 rows -> 1 file(s)
+2026-09-08 19:51:35,515 INFO    datagen.writer | wrote manifest -> /tmp/fullrun/_manifest.json
+2026-09-08 19:51:35,516 INFO    datagen.writer | wrote Unity Catalog DDL -> /tmp/fullrun/_unity_catalog.sql
+2026-09-08 19:51:43,863 INFO    datagen | check: referential integrity subscriptions.user_id -> users.user_id: OK
+2026-09-08 19:51:43,863 INFO    datagen | check: referential integrity usage_events.user_id -> users.user_id: OK
+2026-09-08 19:51:43,863 INFO    datagen | check: referential integrity feature_adoption.user_id -> users.user_id: OK
+2026-09-08 19:51:43,863 INFO    datagen | check: referential integrity support_tickets.user_id -> users.user_id: OK
+2026-09-08 19:51:43,863 INFO    datagen | check: referential integrity crm_touches.user_id -> users.user_id: OK
+2026-09-08 19:51:43,863 INFO    datagen | check: referential integrity churn_labels.user_id -> users.user_id: OK
+2026-09-08 19:51:43,863 INFO    datagen | check: referential integrity crm_touches.campaign_id -> crm_campaigns.campaign_id: OK
+2026-09-08 19:51:43,863 INFO    datagen | check: primary key users(user_id): OK
+2026-09-08 19:51:43,863 INFO    datagen | check: primary key subscriptions(subscription_id): OK
+2026-09-08 19:51:43,864 INFO    datagen | check: primary key usage_events(user_id, event_date): OK
+2026-09-08 19:51:43,864 INFO    datagen | check: primary key feature_adoption(user_id, feature_key, month_start): OK
+2026-09-08 19:51:43,864 INFO    datagen | check: primary key support_tickets(ticket_id): OK
+2026-09-08 19:51:43,864 INFO    datagen | check: primary key crm_campaigns(campaign_id): OK
+2026-09-08 19:51:43,864 INFO    datagen | check: primary key crm_touches(touch_id): OK
+2026-09-08 19:51:43,864 INFO    datagen | check: primary key churn_labels(user_id, month_start): OK
+2026-09-08 19:51:43,864 INFO    datagen | check: usage_events.event_date within window: OK
+2026-09-08 19:51:43,864 INFO    datagen | check: usage_events value ranges plausible: OK
+2026-09-08 19:51:43,864 INFO    datagen | check: monthly churn rate 0.0470 within +/-0.5pt of target 0.0470: OK
+2026-09-08 19:51:43,864 INFO    datagen | check: no usage_events after cancellation (non-reactivated users): OK
+2026-09-08 19:51:43,864 INFO    datagen | check: support_tickets.created_date inside an active subscription term: OK
+2026-09-08 19:51:43,864 INFO    datagen | check: reactivated touches (3444) == reactivation terms (3444): OK
+2026-09-08 19:51:43,864 INFO    datagen | check: reactivations per user <= MAX_REACTIVATIONS (1); observed max 1: OK
+2026-09-08 19:51:43,864 INFO    datagen | check: churn_labels.churn_date set whenever churned: OK
+2026-09-08 19:51:43,864 INFO    datagen | monthly churn rate: 0.0470 (target 0.0470) | users 50,000 | usage_events 10,778,146 rows
+2026-09-08 19:51:43,865 INFO    datagen | churn detail: 26876 churn events / 571848 at-risk user-months = 0.046999
+2026-09-08 19:51:43,865 INFO    datagen | datagen finished | total rows 15,258,791
 ```
 
 ---

@@ -17,7 +17,7 @@ import pandas as pd
 
 from datagen import schemas, tables
 from datagen.config import GeneratorConfig
-from datagen.lifecycle import Lifecycle, simulate
+from datagen.lifecycle import MAX_REACTIVATIONS, Lifecycle, simulate
 from datagen.population import Population, build_population
 from datagen.usage import UsageResult, build_usage_events
 
@@ -249,6 +249,42 @@ def validate(result: GenerationResult) -> list[str]:
         lines.append(
             "no usage_events after cancellation (non-reactivated users): "
             f"{'OK' if leaked == 0 else f'FAIL ({leaked} rows)'}"
+        )
+
+    # A14 tickets must fall inside an A03 term: nobody files a ticket while lapsed.
+    tickets = frames["support_tickets"]
+    if not tickets.empty:
+        spans = cancels[["user_id", "term_start_date", "term_end_date"]]
+        merged = tickets[["ticket_id", "user_id", "created_date"]].merge(
+            spans, on="user_id", how="left"
+        )
+        inside = (merged["created_date"] >= merged["term_start_date"]) & (
+            merged["term_end_date"].isna()
+            | (merged["created_date"] <= merged["term_end_date"])
+        )
+        covered = merged.loc[inside, "ticket_id"].nunique()
+        outside = len(tickets) - covered
+        lines.append(
+            "support_tickets.created_date inside an active subscription term: "
+            f"{'OK' if outside == 0 else f'FAIL ({outside} tickets outside)'}"
+        )
+
+    # Reactivation outcomes and billing terms must agree in count, not just in
+    # which users appear, and must respect the configured cap.
+    touch_frame = frames["crm_touches"]
+    if not touch_frame.empty:
+        reactivated_touches = int(touch_frame["reactivated"].sum())
+        reactivation_terms = int(cancels["is_reactivation"].sum())
+        lines.append(
+            f"reactivated touches ({reactivated_touches}) == reactivation terms "
+            f"({reactivation_terms}): "
+            f"{'OK' if reactivated_touches == reactivation_terms else 'FAIL'}"
+        )
+        per_user = touch_frame[touch_frame["reactivated"]].groupby("user_id").size()
+        worst = int(per_user.max()) if not per_user.empty else 0
+        lines.append(
+            f"reactivations per user <= MAX_REACTIVATIONS ({MAX_REACTIVATIONS}); "
+            f"observed max {worst}: {'OK' if worst <= MAX_REACTIVATIONS else 'FAIL'}"
         )
 
     labels = frames["churn_labels"]

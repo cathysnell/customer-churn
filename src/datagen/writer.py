@@ -217,18 +217,49 @@ def unity_catalog_ddl(config: GeneratorConfig) -> str:
 
 
 def checksum_frames(frames: dict[str, pd.DataFrame]) -> dict[str, str]:
-    """Stable per-table SHA-256 over the frame contents.
+    """Per-table SHA-256 over **canonicalized logical content**, not file bytes.
 
-    Used by the determinism test and printed into the evidence file, so a reader
-    can confirm two runs produced identical bytes without diffing parquet.
+    This is the generator's *guaranteed* determinism invariant: for a fixed seed
+    and config, every table's column names, column order, row order and cell
+    values are identical. What is hashed is explicitly a canonical text rendering
+    of the frame — the header row followed by ``DataFrame.to_csv``, which is
+    stable across platforms for the dtypes emitted here (every float is
+    pre-rounded, so there are no repr differences).
+
+    It deliberately does **not** hash the emitted Parquet bytes. Those are also
+    reproducible in practice — :func:`checksum_files` proves it, and the
+    committed evidence records two-run digests — but Parquet byte-equality is a
+    property of the *writer*, not of this generator: the file footer embeds the
+    pyarrow version string, so upgrading pyarrow changes the bytes while leaving
+    the data identical. Logical content is the invariant worth asserting; file
+    bytes are verified separately and scoped to a pinned environment.
     """
     out: dict[str, str] = {}
     for name in sorted(frames):
         frame = frames[name]
         digest = hashlib.sha256()
         digest.update(",".join(frame.columns).encode("utf-8"))
-        # to_csv is stable across platforms for the dtypes this generator emits
-        # (no float formatting surprises: every float is pre-rounded).
         digest.update(frame.to_csv(index=False).encode("utf-8"))
         out[name] = digest.hexdigest()
+    return out
+
+
+def checksum_files(out_dir: str | Path) -> dict[str, str]:
+    """SHA-256 of each emitted **data file** under ``out_dir``, keyed by rel path.
+
+    Complements :func:`checksum_frames` by hashing what actually landed on disk.
+    Only table data files are hashed: ``_manifest.json`` embeds the absolute
+    ``out_dir``, so it differs between two runs written to different directories
+    even when the data is identical.
+    """
+    root = Path(out_dir)
+    out: dict[str, str] = {}
+    for spec in schemas.TABLES:
+        table_dir = root / spec.name
+        if not table_dir.is_dir():
+            continue
+        for path in sorted(table_dir.rglob("*")):
+            if not path.is_file():
+                continue
+            out[str(path.relative_to(root))] = hashlib.sha256(path.read_bytes()).hexdigest()
     return out

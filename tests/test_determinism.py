@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -10,7 +12,7 @@ from datagen import schemas
 from datagen.config import DEFAULT_SEED, GeneratorConfig
 from datagen.pipeline import generate
 from datagen.rng import stream_entropy, substream
-from datagen.writer import checksum_frames
+from datagen.writer import checksum_files, checksum_frames, write_all
 
 
 def test_same_seed_produces_identical_frames(tiny_config: GeneratorConfig) -> None:
@@ -28,13 +30,66 @@ def test_same_seed_produces_identical_frames(tiny_config: GeneratorConfig) -> No
         )
 
 
-def test_same_seed_produces_identical_checksums(tiny_config: GeneratorConfig) -> None:
-    """The per-table SHA-256 digests printed in the evidence are reproducible."""
+def test_same_seed_produces_identical_content_checksums(
+    tiny_config: GeneratorConfig,
+) -> None:
+    """The canonical-content digests printed in the evidence are reproducible.
+
+    These hash a canonical text rendering of each frame (see
+    :func:`datagen.writer.checksum_frames`) — i.e. the generator's guaranteed
+    invariant, deterministic *logical content*.
+    """
     first = checksum_frames(generate(tiny_config).frames)
     second = checksum_frames(generate(tiny_config).frames)
     assert first == second
     # Every table must actually be covered by a digest.
     assert set(first) == set(schemas.table_names())
+
+
+def test_same_seed_produces_identical_parquet_bytes(tmp_path: Path) -> None:
+    """Two runs written to disk produce byte-identical Parquet **files**.
+
+    This is the check that hashes what actually lands on disk, rather than an
+    in-memory serialization. It is scoped to a single pinned environment: the
+    Parquet footer embeds the writer version, so this asserts the generator
+    contributes no nondeterminism of its own, not that Parquet bytes are stable
+    across pyarrow upgrades. The always-true invariant is content equality,
+    covered by ``test_same_seed_produces_identical_content_checksums``.
+    """
+    digests = []
+    for run in ("a", "b"):
+        config = GeneratorConfig(
+            users=80,
+            months=3,
+            out_dir=str(tmp_path / run),
+            output_format="parquet",
+            partitioned=False,
+        )
+        write_all(generate(config).frames, config)
+        digests.append(checksum_files(config.out_dir))
+
+    assert digests[0] == digests[1]
+    # Guard against a vacuous pass if nothing was written.
+    assert len(digests[0]) == len(schemas.table_names())
+    assert all(name.endswith(".parquet") for name in digests[0])
+
+
+def test_parquet_bytes_are_deterministic_when_partitioned(tmp_path: Path) -> None:
+    """Byte determinism also holds for the Hive-partitioned layout."""
+    digests = []
+    for run in ("a", "b"):
+        config = GeneratorConfig(
+            users=60,
+            months=3,
+            out_dir=str(tmp_path / run),
+            output_format="parquet",
+            partitioned=True,
+        )
+        write_all(generate(config).frames, config)
+        digests.append(checksum_files(config.out_dir))
+
+    assert digests[0] == digests[1]
+    assert any("event_date=" in name for name in digests[0])
 
 
 def test_different_seed_produces_different_data(tiny_config: GeneratorConfig) -> None:
