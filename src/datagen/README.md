@@ -311,7 +311,7 @@ a regression cannot hide behind matching user-id sets.
 ## Tests
 
 ```bash
-python -m pytest          # 155 tests, ~22s
+python -m pytest          # 163 tests, ~22s
 python -m ruff check src tests
 ```
 
@@ -323,7 +323,27 @@ Coverage maps to the acceptance criteria:
 | `test_schema.py` | exact columns in order, dtypes, non-nullability, unique PKs, every column documented, `conform` rejects drift |
 | `test_referential_integrity.py` | no orphan `user_id`/`campaign_id`; no activity before signup or during a lapse; **support tickets inside an A03 term**; **reactivation touch/term cardinality + the MAX_REACTIVATIONS cap**; non-overlapping terms; acceptance rate matches its components |
 | `test_churn_signal.py` | churners have lower late-window coding hours / acceptance / session frequency; negative correlations; churn rate in band and tunable; geo variation; **power-user flag recomputed exactly from `usage_events`**; retention touches *causally* reduce churn |
-| `test_cli_and_output.py` | volume knobs; parquet round-trip; Hive layout; manifest; UC DDL; evidence sections **incl. churn numerator/denominator and timing segregation**; CLI flags |
+| `test_cli_and_output.py` | volume knobs; parquet round-trip; Hive layout; manifest; UC DDL (incl. the committed-file drift guard); evidence sections **incl. churn numerator/denominator and timing segregation**; CLI flags; **the no-data-committed policy** (below) |
+
+### How the no-data policy is enforced
+
+Two tests check the git index, catching complementary gaps — neither alone is
+sufficient, so both are needed:
+
+| Test | Asserts |
+| --- | --- |
+| `test_no_paths_under_data_are_tracked_by_git` | No tracked path is `data` or starts with `data/`, **regardless of extension** — so `data/foo.txt` fails, not only `*.parquet`. |
+| `test_no_data_artifacts_are_tracked_anywhere` | No tracked path ends in `.parquet`/`.csv`/`.xlsx`/`.db` at **any** location — catching data committed outside `data/`. |
+
+Each prong's classifier is a small pure helper (`paths_under_data`,
+`data_artifact_paths`) so a companion test can run it over synthetic path lists
+containing known violations. That matters: a test that only ever sees an
+already-clean index cannot demonstrate it would actually reject a bad one.
+
+`test_text_evidence_is_tracked_by_git` is a **complementary** guard, not a no-data
+check — it asserts the graded text evidence and `sql/unity_catalog.sql` stay
+committed, and would pass even if data were tracked. Removing data from git is
+only acceptable because that text remains.
 
 Two notes on how the behavioural tests are written:
 

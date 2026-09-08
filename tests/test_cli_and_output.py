@@ -232,47 +232,98 @@ def test_cli_emit_ddl_writes_the_same_ddl(tmp_path: Path) -> None:
     assert target.read_text() == unity_catalog_ddl()
 
 
-def test_no_generated_data_files_are_tracked_by_git() -> None:
-    """No data artifact may be committed — the dataset is reproducible from code.
+# ---------------------------------------------------------------------------
+# No-data policy: no generated data artifact is tracked by git.
+#
+# Enforced by TWO independent prongs, because either one alone leaves a gap:
+#   * paths_under_data()      catches ANY path under data/, whatever its
+#                             extension — e.g. data/foo.txt, data/README.md.
+#   * data_artifact_paths()   catches data extensions ANYWHERE in the repo —
+#                             e.g. exports/users.parquet, outside data/.
+# The classification lives in these two pure helpers so the checks can be
+# proved against synthetic path lists (see the two `_catches_` tests) rather
+# than only against the current, already-clean index — a test that only ever
+# sees a passing repo cannot demonstrate that it would catch a violation.
+# ---------------------------------------------------------------------------
 
-    A regenerated dataset is easy to re-create and expensive to review, so the
-    repo tracks execution evidence as text instead. This asserts the policy
-    directly against the git index so a stray `git add data/...` fails here.
-    """
+DATA_SUFFIXES = (".parquet", ".csv", ".xlsx", ".db")
+
+
+def paths_under_data(tracked: list[str]) -> list[str]:
+    """Tracked paths inside the (gitignored) ``data/`` tree, regardless of suffix."""
+    return [p for p in tracked if p == "data" or p.startswith("data/")]
+
+
+def data_artifact_paths(tracked: list[str]) -> list[str]:
+    """Tracked paths with a generated-data suffix, anywhere in the repo."""
+    return [p for p in tracked if p.endswith(DATA_SUFFIXES)]
+
+
+def _tracked_files() -> list[str]:
+    """Every path in the git index, NUL-split so odd filenames survive."""
     repo = Path(__file__).resolve().parents[1]
-    tracked = subprocess.run(
+    out = subprocess.run(
         ["git", "ls-files", "-z"],
         cwd=repo,
         capture_output=True,
         text=True,
         check=True,
-    ).stdout.split("\0")
-    tracked = [p for p in tracked if p]
-    assert tracked, "git ls-files returned nothing; test cannot verify the policy"
+    ).stdout
+    tracked = [p for p in out.split("\0") if p]
+    assert tracked, "git ls-files returned nothing; the policy checks would be vacuous"
+    return tracked
 
-    under_data = [p for p in tracked if p == "data" or p.startswith("data/")]
-    assert not under_data, f"data files are tracked: {under_data}"
 
-    data_suffixes = (".parquet", ".csv", ".xlsx", ".db")
-    binary_data = [p for p in tracked if p.endswith(data_suffixes)]
-    assert not binary_data, f"generated data artifacts are tracked: {binary_data}"
+def test_no_paths_under_data_are_tracked_by_git() -> None:
+    """PRONG 1 — nothing under `data/` is tracked, whatever the file extension.
+
+    The dataset is reproducible from code, so `data/` is generated locally and
+    gitignored in full. This fails on a stray `git add -f data/anything`.
+    """
+    offenders = paths_under_data(_tracked_files())
+    assert not offenders, f"paths under data/ are tracked: {offenders}"
+
+
+def test_no_data_artifacts_are_tracked_anywhere() -> None:
+    """PRONG 2 — no `.parquet`/`.csv`/`.xlsx`/`.db` is tracked, at any path.
+
+    Catches data committed *outside* `data/`, which prong 1 cannot see.
+    """
+    offenders = data_artifact_paths(_tracked_files())
+    assert not offenders, f"generated data artifacts are tracked: {offenders}"
+
+
+def test_prong_one_catches_any_data_path_regardless_of_extension() -> None:
+    """Prove prong 1 catches a non-data-extension file under `data/`."""
+    assert paths_under_data(["data/foo.txt"]) == ["data/foo.txt"]
+    assert paths_under_data(["data/sample/notes.md"]) == ["data/sample/notes.md"]
+    assert paths_under_data(["data"]) == ["data"]
+    # Must not fire on look-alike paths outside the data/ tree.
+    assert paths_under_data(["src/datagen/database.py", "metadata/x", "mydata/y"]) == []
+
+
+def test_prong_two_catches_data_extensions_outside_the_data_dir() -> None:
+    """Prove prong 2 catches a data artifact committed outside `data/`."""
+    assert data_artifact_paths(["exports/users.parquet"]) == ["exports/users.parquet"]
+    assert data_artifact_paths(["docs/metrics.csv"]) == ["docs/metrics.csv"]
+    assert data_artifact_paths(["src/datagen/cli.py", "README.md"]) == []
 
 
 def test_text_evidence_is_tracked_by_git() -> None:
-    """The graded artifacts are the text evidence files; they must stay committed."""
-    repo = Path(__file__).resolve().parents[1]
-    tracked = subprocess.run(
-        ["git", "ls-files", "evidence"],
-        cwd=repo,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.split()
+    """Complementary guard (NOT a no-data check): the graded text stays committed.
+
+    Removing data from git is only acceptable because the evidence proving the
+    generator ran is text and remains committed. This asserts that side of the
+    trade; the no-data policy itself is enforced by the two prongs above.
+    """
+    tracked = _tracked_files()
 
     assert "evidence/datagen-sample-run.md" in tracked
     assert "evidence/datagen-fullscale-run.md" in tracked
     assert "evidence/pytest-output.txt" in tracked
-    assert any(p.endswith(".log") for p in tracked)
+    assert any(p.startswith("evidence/") and p.endswith(".log") for p in tracked)
+    # The Unity Catalog DDL is the one generated artifact kept, as text.
+    assert "sql/unity_catalog.sql" in tracked
 
 
 # ---------------------------------------------------------------------------

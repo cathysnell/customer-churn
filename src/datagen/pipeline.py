@@ -189,17 +189,21 @@ def validate(result: GenerationResult) -> list[str]:
         "churn_labels",
     )
     for child in child_tables:
-        orphans = set(frames[child]["user_id"]) - users
+        child_users = set(frames[child]["user_id"])
+        orphans = child_users - users
         lines.append(
             f"referential integrity {child}.user_id -> users.user_id: "
-            f"{'OK' if not orphans else f'FAIL ({len(orphans)} orphans)'}"
+            f"{len(orphans):,}/{len(child_users):,} distinct ids orphaned -> "
+            f"{'OK' if not orphans else 'FAIL'}"
         )
 
     campaigns = set(frames["crm_campaigns"]["campaign_id"])
-    orphan_campaigns = set(frames["crm_touches"]["campaign_id"]) - campaigns
+    touch_campaigns = set(frames["crm_touches"]["campaign_id"])
+    orphan_campaigns = touch_campaigns - campaigns
     lines.append(
         "referential integrity crm_touches.campaign_id -> crm_campaigns.campaign_id: "
-        f"{'OK' if not orphan_campaigns else f'FAIL ({len(orphan_campaigns)})'}"
+        f"{len(orphan_campaigns):,}/{len(touch_campaigns):,} orphaned -> "
+        f"{'OK' if not orphan_campaigns else 'FAIL'}"
     )
 
     for name in schemas.table_names():
@@ -210,7 +214,8 @@ def validate(result: GenerationResult) -> list[str]:
         dupes = int(frame.duplicated(subset=list(spec.primary_key)).sum())
         lines.append(
             f"primary key {name}({', '.join(spec.primary_key)}): "
-            f"{'OK' if dupes == 0 else f'FAIL ({dupes} duplicates)'}"
+            f"{dupes:,}/{len(frame):,} rows duplicated -> "
+            f"{'OK' if dupes == 0 else 'FAIL'}"
         )
 
     events = frames["usage_events"]
@@ -246,9 +251,11 @@ def validate(result: GenerationResult) -> list[str]:
         check = events.merge(last_cancel, on="user_id", how="inner")
         check = check[~check["user_id"].isin(reactivated)]
         leaked = int((check["event_date"] > check["cancel_date"]).sum())
+        # Print the measured fraction even when it passes: "OK" alone leaves the
+        # reader trusting the check, whereas "0/43,514" is self-evident.
         lines.append(
-            "no usage_events after cancellation (non-reactivated users): "
-            f"{'OK' if leaked == 0 else f'FAIL ({leaked} rows)'}"
+            f"usage_events after cancellation (non-reactivated users): {leaked:,}/"
+            f"{len(check):,} rows outside -> {'OK' if leaked == 0 else 'FAIL'}"
         )
 
     # A14 tickets must fall inside an A03 term: nobody files a ticket while lapsed.
@@ -266,7 +273,8 @@ def validate(result: GenerationResult) -> list[str]:
         outside = len(tickets) - covered
         lines.append(
             "support_tickets.created_date inside an active subscription term: "
-            f"{'OK' if outside == 0 else f'FAIL ({outside} tickets outside)'}"
+            f"{outside:,}/{len(tickets):,} tickets outside -> "
+            f"{'OK' if outside == 0 else 'FAIL'}"
         )
 
     # Reactivation outcomes and billing terms must agree in count, not just in

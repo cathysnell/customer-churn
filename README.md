@@ -78,7 +78,7 @@ full scale (~15.3M rows), with a `--sample-frac` flag for fast runs.
   sample run, with two-run reproducibility digests),
   [`evidence/datagen-fullscale-run.md`](evidence/datagen-fullscale-run.md) +
   [`.log`](evidence/datagen-fullscale-run.log) (50,000-user run, 15,258,791 rows),
-  [`evidence/pytest-output.txt`](evidence/pytest-output.txt) (155 tests + lint)
+  [`evidence/pytest-output.txt`](evidence/pytest-output.txt) (163 tests + lint)
 - **Unity Catalog DDL:** [`sql/unity_catalog.sql`](sql/unity_catalog.sql) — text,
   derived purely from the table specs, so the governance stage can run it verbatim.
 

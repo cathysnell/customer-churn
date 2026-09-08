@@ -783,26 +783,26 @@ tenure_months                          -0.0226
 Run by `datagen.pipeline.validate` on the frames emitted above.
 
 ```text
-referential integrity subscriptions.user_id -> users.user_id: OK
-referential integrity usage_events.user_id -> users.user_id: OK
-referential integrity feature_adoption.user_id -> users.user_id: OK
-referential integrity support_tickets.user_id -> users.user_id: OK
-referential integrity crm_touches.user_id -> users.user_id: OK
-referential integrity churn_labels.user_id -> users.user_id: OK
-referential integrity crm_touches.campaign_id -> crm_campaigns.campaign_id: OK
-primary key users(user_id): OK
-primary key subscriptions(subscription_id): OK
-primary key usage_events(user_id, event_date): OK
-primary key feature_adoption(user_id, feature_key, month_start): OK
-primary key support_tickets(ticket_id): OK
-primary key crm_campaigns(campaign_id): OK
-primary key crm_touches(touch_id): OK
-primary key churn_labels(user_id, month_start): OK
+referential integrity subscriptions.user_id -> users.user_id: 0/200 distinct ids orphaned -> OK
+referential integrity usage_events.user_id -> users.user_id: 0/199 distinct ids orphaned -> OK
+referential integrity feature_adoption.user_id -> users.user_id: 0/200 distinct ids orphaned -> OK
+referential integrity support_tickets.user_id -> users.user_id: 0/120 distinct ids orphaned -> OK
+referential integrity crm_touches.user_id -> users.user_id: 0/196 distinct ids orphaned -> OK
+referential integrity churn_labels.user_id -> users.user_id: 0/200 distinct ids orphaned -> OK
+referential integrity crm_touches.campaign_id -> crm_campaigns.campaign_id: 0/5 orphaned -> OK
+primary key users(user_id): 0/200 rows duplicated -> OK
+primary key subscriptions(subscription_id): 0/220 rows duplicated -> OK
+primary key usage_events(user_id, event_date): 0/43,514 rows duplicated -> OK
+primary key feature_adoption(user_id, feature_key, month_start): 0/13,620 rows duplicated -> OK
+primary key support_tickets(ticket_id): 0/223 rows duplicated -> OK
+primary key crm_campaigns(campaign_id): 0/5 rows duplicated -> OK
+primary key crm_touches(touch_id): 0/1,098 rows duplicated -> OK
+primary key churn_labels(user_id, month_start): 0/2,257 rows duplicated -> OK
 usage_events.event_date within window: OK
 usage_events value ranges plausible: OK
 monthly churn rate 0.0470 within +/-0.5pt of target 0.0470: OK
-no usage_events after cancellation (non-reactivated users): OK
-support_tickets.created_date inside an active subscription term: OK
+usage_events after cancellation (non-reactivated users): 0/7,377 rows outside -> OK
+support_tickets.created_date inside an active subscription term: 0/223 tickets outside -> OK
 reactivated touches (13) == reactivation terms (13): OK
 reactivations per user <= MAX_REACTIVATIONS (1); observed max 1: OK
 churn_labels.churn_date set whenever churned: OK
@@ -1166,97 +1166,97 @@ Written alongside the data by the run. This is the handoff contract to the Lakef
 | Stage | Wall clock |
 | --- | --- |
 | population | 0.005 |
-| lifecycle | 0.129 |
-| usage_events | 0.054 |
+| lifecycle | 0.138 |
+| usage_events | 0.062 |
 | users | 0.001 |
-| subscriptions | 0.018 |
-| feature_adoption | 0.016 |
+| subscriptions | 0.019 |
+| feature_adoption | 0.018 |
 | support_tickets | 0.005 |
 | crm_campaigns | 0.001 |
-| crm_touches | 0.003 |
+| crm_touches | 0.004 |
 | churn_labels | 0.007 |
-| conform | 0.097 |
+| conform | 0.106 |
 
 ### Console log
 
 Captured verbatim from the generator's stderr logger. Timestamps are wall-clock and therefore differ per run.
 
 ```console
-2026-09-08 20:06:23,847 INFO    datagen | datagen starting | seed=1729 users_requested=50000 sample_frac=0.004 users_effective=200 months=18 window_start=2025-03-01 window_end=2026-08-31 days=549 target_monthly_churn_rate=0.047 target_reactivation_rate=0.08 power_user_bar=>=4.0 coding hours/day on >=5 days/week campaigns=5 output_format=parquet partitioned=False out_dir=data/sample
-2026-09-08 20:06:23,847 INFO    datagen | building population: 200 users, 18 months (2025-03-01 .. 2026-08-31)
-2026-09-08 20:06:23,852 INFO    datagen | simulating subscription lifecycle + CRM (calibrating churn hazard)
-2026-09-08 20:06:23,981 INFO    datagen | hazard intercept calibrated to -2.20312 in 10 iterations -> monthly churn 0.0470 (target 0.0470)
-2026-09-08 20:06:23,981 INFO    datagen | generating usage_events (active days only)
-2026-09-08 20:06:24,035 INFO    datagen | usage_events: 43,514 rows
-2026-09-08 20:06:24,184 INFO    datagen | users                     200 rows
-2026-09-08 20:06:24,184 INFO    datagen | subscriptions             220 rows
-2026-09-08 20:06:24,184 INFO    datagen | usage_events           43,514 rows
-2026-09-08 20:06:24,184 INFO    datagen | feature_adoption       13,620 rows
-2026-09-08 20:06:24,184 INFO    datagen | support_tickets           223 rows
-2026-09-08 20:06:24,184 INFO    datagen | crm_campaigns               5 rows
-2026-09-08 20:06:24,184 INFO    datagen | crm_touches             1,098 rows
-2026-09-08 20:06:24,184 INFO    datagen | churn_labels            2,257 rows
-2026-09-08 20:06:24,218 INFO    datagen.writer | wrote users                     200 rows -> 1 file(s)
-2026-09-08 20:06:24,221 INFO    datagen.writer | wrote subscriptions             220 rows -> 1 file(s)
-2026-09-08 20:06:24,244 INFO    datagen.writer | wrote usage_events           43,514 rows -> 1 file(s)
-2026-09-08 20:06:24,259 INFO    datagen.writer | wrote feature_adoption       13,620 rows -> 1 file(s)
-2026-09-08 20:06:24,261 INFO    datagen.writer | wrote support_tickets           223 rows -> 1 file(s)
-2026-09-08 20:06:24,263 INFO    datagen.writer | wrote crm_campaigns               5 rows -> 1 file(s)
-2026-09-08 20:06:24,266 INFO    datagen.writer | wrote crm_touches             1,098 rows -> 1 file(s)
-2026-09-08 20:06:24,272 INFO    datagen.writer | wrote churn_labels            2,257 rows -> 1 file(s)
-2026-09-08 20:06:24,273 INFO    datagen.writer | wrote manifest -> data/sample/_manifest.json
-2026-09-08 20:06:24,274 INFO    datagen.writer | wrote Unity Catalog DDL -> data/sample/_unity_catalog.sql
-2026-09-08 20:06:24,306 INFO    datagen | check: referential integrity subscriptions.user_id -> users.user_id: OK
-2026-09-08 20:06:24,306 INFO    datagen | check: referential integrity usage_events.user_id -> users.user_id: OK
-2026-09-08 20:06:24,306 INFO    datagen | check: referential integrity feature_adoption.user_id -> users.user_id: OK
-2026-09-08 20:06:24,306 INFO    datagen | check: referential integrity support_tickets.user_id -> users.user_id: OK
-2026-09-08 20:06:24,306 INFO    datagen | check: referential integrity crm_touches.user_id -> users.user_id: OK
-2026-09-08 20:06:24,306 INFO    datagen | check: referential integrity churn_labels.user_id -> users.user_id: OK
-2026-09-08 20:06:24,306 INFO    datagen | check: referential integrity crm_touches.campaign_id -> crm_campaigns.campaign_id: OK
-2026-09-08 20:06:24,306 INFO    datagen | check: primary key users(user_id): OK
-2026-09-08 20:06:24,306 INFO    datagen | check: primary key subscriptions(subscription_id): OK
-2026-09-08 20:06:24,306 INFO    datagen | check: primary key usage_events(user_id, event_date): OK
-2026-09-08 20:06:24,306 INFO    datagen | check: primary key feature_adoption(user_id, feature_key, month_start): OK
-2026-09-08 20:06:24,306 INFO    datagen | check: primary key support_tickets(ticket_id): OK
-2026-09-08 20:06:24,306 INFO    datagen | check: primary key crm_campaigns(campaign_id): OK
-2026-09-08 20:06:24,306 INFO    datagen | check: primary key crm_touches(touch_id): OK
-2026-09-08 20:06:24,306 INFO    datagen | check: primary key churn_labels(user_id, month_start): OK
-2026-09-08 20:06:24,306 INFO    datagen | check: usage_events.event_date within window: OK
-2026-09-08 20:06:24,306 INFO    datagen | check: usage_events value ranges plausible: OK
-2026-09-08 20:06:24,306 INFO    datagen | check: monthly churn rate 0.0470 within +/-0.5pt of target 0.0470: OK
-2026-09-08 20:06:24,306 INFO    datagen | check: no usage_events after cancellation (non-reactivated users): OK
-2026-09-08 20:06:24,306 INFO    datagen | check: support_tickets.created_date inside an active subscription term: OK
-2026-09-08 20:06:24,306 INFO    datagen | check: reactivated touches (13) == reactivation terms (13): OK
-2026-09-08 20:06:24,306 INFO    datagen | check: reactivations per user <= MAX_REACTIVATIONS (1); observed max 1: OK
-2026-09-08 20:06:24,306 INFO    datagen | check: churn_labels.churn_date set whenever churned: OK
-2026-09-08 20:06:24,306 INFO    datagen | monthly churn rate: 0.0470 (target 0.0470) | users 200 | usage_events 43,514 rows
-2026-09-08 20:06:24,307 INFO    datagen | churn detail: 106 churn events / 2257 at-risk user-months = 0.046965
-2026-09-08 20:06:24,307 INFO    datagen | datagen finished | total rows 61,137
-2026-09-08 20:06:24,310 INFO    datagen | verifying reproducibility: regenerating into a temporary directory
-2026-09-08 20:06:24,636 INFO    datagen | building population: 200 users, 18 months (2025-03-01 .. 2026-08-31)
-2026-09-08 20:06:24,640 INFO    datagen | simulating subscription lifecycle + CRM (calibrating churn hazard)
-2026-09-08 20:06:24,792 INFO    datagen | hazard intercept calibrated to -2.20312 in 10 iterations -> monthly churn 0.0470 (target 0.0470)
-2026-09-08 20:06:24,792 INFO    datagen | generating usage_events (active days only)
-2026-09-08 20:06:24,850 INFO    datagen | usage_events: 43,514 rows
-2026-09-08 20:06:25,017 INFO    datagen | users                     200 rows
-2026-09-08 20:06:25,017 INFO    datagen | subscriptions             220 rows
-2026-09-08 20:06:25,017 INFO    datagen | usage_events           43,514 rows
-2026-09-08 20:06:25,017 INFO    datagen | feature_adoption       13,620 rows
-2026-09-08 20:06:25,017 INFO    datagen | support_tickets           223 rows
-2026-09-08 20:06:25,017 INFO    datagen | crm_campaigns               5 rows
-2026-09-08 20:06:25,017 INFO    datagen | crm_touches             1,098 rows
-2026-09-08 20:06:25,017 INFO    datagen | churn_labels            2,257 rows
-2026-09-08 20:06:25,344 INFO    datagen.writer | wrote users                     200 rows -> 1 file(s)
-2026-09-08 20:06:25,347 INFO    datagen.writer | wrote subscriptions             220 rows -> 1 file(s)
-2026-09-08 20:06:25,370 INFO    datagen.writer | wrote usage_events           43,514 rows -> 1 file(s)
-2026-09-08 20:06:25,387 INFO    datagen.writer | wrote feature_adoption       13,620 rows -> 1 file(s)
-2026-09-08 20:06:25,389 INFO    datagen.writer | wrote support_tickets           223 rows -> 1 file(s)
-2026-09-08 20:06:25,391 INFO    datagen.writer | wrote crm_campaigns               5 rows -> 1 file(s)
-2026-09-08 20:06:25,394 INFO    datagen.writer | wrote crm_touches             1,098 rows -> 1 file(s)
-2026-09-08 20:06:25,401 INFO    datagen.writer | wrote churn_labels            2,257 rows -> 1 file(s)
-2026-09-08 20:06:25,402 INFO    datagen.writer | wrote manifest -> /tmp/datagen-verify-8ksi4wwk/_manifest.json
-2026-09-08 20:06:25,402 INFO    datagen.writer | wrote Unity Catalog DDL -> /tmp/datagen-verify-8ksi4wwk/_unity_catalog.sql
-2026-09-08 20:06:25,408 INFO    datagen | reproducibility: content digests MATCH | parquet byte digests MATCH
+2026-09-08 20:16:56,053 INFO    datagen | datagen starting | seed=1729 users_requested=50000 sample_frac=0.004 users_effective=200 months=18 window_start=2025-03-01 window_end=2026-08-31 days=549 target_monthly_churn_rate=0.047 target_reactivation_rate=0.08 power_user_bar=>=4.0 coding hours/day on >=5 days/week campaigns=5 output_format=parquet partitioned=False out_dir=data/sample
+2026-09-08 20:16:56,053 INFO    datagen | building population: 200 users, 18 months (2025-03-01 .. 2026-08-31)
+2026-09-08 20:16:56,059 INFO    datagen | simulating subscription lifecycle + CRM (calibrating churn hazard)
+2026-09-08 20:16:56,197 INFO    datagen | hazard intercept calibrated to -2.20312 in 10 iterations -> monthly churn 0.0470 (target 0.0470)
+2026-09-08 20:16:56,197 INFO    datagen | generating usage_events (active days only)
+2026-09-08 20:16:56,259 INFO    datagen | usage_events: 43,514 rows
+2026-09-08 20:16:56,420 INFO    datagen | users                     200 rows
+2026-09-08 20:16:56,420 INFO    datagen | subscriptions             220 rows
+2026-09-08 20:16:56,420 INFO    datagen | usage_events           43,514 rows
+2026-09-08 20:16:56,420 INFO    datagen | feature_adoption       13,620 rows
+2026-09-08 20:16:56,420 INFO    datagen | support_tickets           223 rows
+2026-09-08 20:16:56,420 INFO    datagen | crm_campaigns               5 rows
+2026-09-08 20:16:56,421 INFO    datagen | crm_touches             1,098 rows
+2026-09-08 20:16:56,421 INFO    datagen | churn_labels            2,257 rows
+2026-09-08 20:16:56,457 INFO    datagen.writer | wrote users                     200 rows -> 1 file(s)
+2026-09-08 20:16:56,460 INFO    datagen.writer | wrote subscriptions             220 rows -> 1 file(s)
+2026-09-08 20:16:56,483 INFO    datagen.writer | wrote usage_events           43,514 rows -> 1 file(s)
+2026-09-08 20:16:56,497 INFO    datagen.writer | wrote feature_adoption       13,620 rows -> 1 file(s)
+2026-09-08 20:16:56,499 INFO    datagen.writer | wrote support_tickets           223 rows -> 1 file(s)
+2026-09-08 20:16:56,501 INFO    datagen.writer | wrote crm_campaigns               5 rows -> 1 file(s)
+2026-09-08 20:16:56,504 INFO    datagen.writer | wrote crm_touches             1,098 rows -> 1 file(s)
+2026-09-08 20:16:56,509 INFO    datagen.writer | wrote churn_labels            2,257 rows -> 1 file(s)
+2026-09-08 20:16:56,510 INFO    datagen.writer | wrote manifest -> data/sample/_manifest.json
+2026-09-08 20:16:56,510 INFO    datagen.writer | wrote Unity Catalog DDL -> data/sample/_unity_catalog.sql
+2026-09-08 20:16:56,540 INFO    datagen | check: referential integrity subscriptions.user_id -> users.user_id: 0/200 distinct ids orphaned -> OK
+2026-09-08 20:16:56,540 INFO    datagen | check: referential integrity usage_events.user_id -> users.user_id: 0/199 distinct ids orphaned -> OK
+2026-09-08 20:16:56,540 INFO    datagen | check: referential integrity feature_adoption.user_id -> users.user_id: 0/200 distinct ids orphaned -> OK
+2026-09-08 20:16:56,540 INFO    datagen | check: referential integrity support_tickets.user_id -> users.user_id: 0/120 distinct ids orphaned -> OK
+2026-09-08 20:16:56,540 INFO    datagen | check: referential integrity crm_touches.user_id -> users.user_id: 0/196 distinct ids orphaned -> OK
+2026-09-08 20:16:56,540 INFO    datagen | check: referential integrity churn_labels.user_id -> users.user_id: 0/200 distinct ids orphaned -> OK
+2026-09-08 20:16:56,540 INFO    datagen | check: referential integrity crm_touches.campaign_id -> crm_campaigns.campaign_id: 0/5 orphaned -> OK
+2026-09-08 20:16:56,540 INFO    datagen | check: primary key users(user_id): 0/200 rows duplicated -> OK
+2026-09-08 20:16:56,540 INFO    datagen | check: primary key subscriptions(subscription_id): 0/220 rows duplicated -> OK
+2026-09-08 20:16:56,540 INFO    datagen | check: primary key usage_events(user_id, event_date): 0/43,514 rows duplicated -> OK
+2026-09-08 20:16:56,540 INFO    datagen | check: primary key feature_adoption(user_id, feature_key, month_start): 0/13,620 rows duplicated -> OK
+2026-09-08 20:16:56,540 INFO    datagen | check: primary key support_tickets(ticket_id): 0/223 rows duplicated -> OK
+2026-09-08 20:16:56,540 INFO    datagen | check: primary key crm_campaigns(campaign_id): 0/5 rows duplicated -> OK
+2026-09-08 20:16:56,540 INFO    datagen | check: primary key crm_touches(touch_id): 0/1,098 rows duplicated -> OK
+2026-09-08 20:16:56,540 INFO    datagen | check: primary key churn_labels(user_id, month_start): 0/2,257 rows duplicated -> OK
+2026-09-08 20:16:56,540 INFO    datagen | check: usage_events.event_date within window: OK
+2026-09-08 20:16:56,540 INFO    datagen | check: usage_events value ranges plausible: OK
+2026-09-08 20:16:56,540 INFO    datagen | check: monthly churn rate 0.0470 within +/-0.5pt of target 0.0470: OK
+2026-09-08 20:16:56,541 INFO    datagen | check: usage_events after cancellation (non-reactivated users): 0/7,377 rows outside -> OK
+2026-09-08 20:16:56,541 INFO    datagen | check: support_tickets.created_date inside an active subscription term: 0/223 tickets outside -> OK
+2026-09-08 20:16:56,541 INFO    datagen | check: reactivated touches (13) == reactivation terms (13): OK
+2026-09-08 20:16:56,541 INFO    datagen | check: reactivations per user <= MAX_REACTIVATIONS (1); observed max 1: OK
+2026-09-08 20:16:56,541 INFO    datagen | check: churn_labels.churn_date set whenever churned: OK
+2026-09-08 20:16:56,541 INFO    datagen | monthly churn rate: 0.0470 (target 0.0470) | users 200 | usage_events 43,514 rows
+2026-09-08 20:16:56,541 INFO    datagen | churn detail: 106 churn events / 2257 at-risk user-months = 0.046965
+2026-09-08 20:16:56,541 INFO    datagen | datagen finished | total rows 61,137
+2026-09-08 20:16:56,544 INFO    datagen | verifying reproducibility: regenerating into a temporary directory
+2026-09-08 20:16:56,875 INFO    datagen | building population: 200 users, 18 months (2025-03-01 .. 2026-08-31)
+2026-09-08 20:16:56,879 INFO    datagen | simulating subscription lifecycle + CRM (calibrating churn hazard)
+2026-09-08 20:16:57,014 INFO    datagen | hazard intercept calibrated to -2.20312 in 10 iterations -> monthly churn 0.0470 (target 0.0470)
+2026-09-08 20:16:57,014 INFO    datagen | generating usage_events (active days only)
+2026-09-08 20:16:57,072 INFO    datagen | usage_events: 43,514 rows
+2026-09-08 20:16:57,235 INFO    datagen | users                     200 rows
+2026-09-08 20:16:57,235 INFO    datagen | subscriptions             220 rows
+2026-09-08 20:16:57,235 INFO    datagen | usage_events           43,514 rows
+2026-09-08 20:16:57,235 INFO    datagen | feature_adoption       13,620 rows
+2026-09-08 20:16:57,235 INFO    datagen | support_tickets           223 rows
+2026-09-08 20:16:57,235 INFO    datagen | crm_campaigns               5 rows
+2026-09-08 20:16:57,235 INFO    datagen | crm_touches             1,098 rows
+2026-09-08 20:16:57,235 INFO    datagen | churn_labels            2,257 rows
+2026-09-08 20:16:57,567 INFO    datagen.writer | wrote users                     200 rows -> 1 file(s)
+2026-09-08 20:16:57,570 INFO    datagen.writer | wrote subscriptions             220 rows -> 1 file(s)
+2026-09-08 20:16:57,593 INFO    datagen.writer | wrote usage_events           43,514 rows -> 1 file(s)
+2026-09-08 20:16:57,606 INFO    datagen.writer | wrote feature_adoption       13,620 rows -> 1 file(s)
+2026-09-08 20:16:57,608 INFO    datagen.writer | wrote support_tickets           223 rows -> 1 file(s)
+2026-09-08 20:16:57,610 INFO    datagen.writer | wrote crm_campaigns               5 rows -> 1 file(s)
+2026-09-08 20:16:57,613 INFO    datagen.writer | wrote crm_touches             1,098 rows -> 1 file(s)
+2026-09-08 20:16:57,619 INFO    datagen.writer | wrote churn_labels            2,257 rows -> 1 file(s)
+2026-09-08 20:16:57,620 INFO    datagen.writer | wrote manifest -> /tmp/datagen-verify-u_4yffxh/_manifest.json
+2026-09-08 20:16:57,620 INFO    datagen.writer | wrote Unity Catalog DDL -> /tmp/datagen-verify-u_4yffxh/_unity_catalog.sql
+2026-09-08 20:16:57,626 INFO    datagen | reproducibility: content digests MATCH | parquet byte digests MATCH
 ```
 
 ---
