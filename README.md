@@ -4,10 +4,15 @@ An end-to-end Databricks data journey built for the **FE Bar program**: a workin
 prototype that solves a *specific* customer problem in a *specific* industry, from
 raw data all the way to a business-facing app.
 
-> **Industry / customer problem:** _TBD — pending inputs._ This will be a concrete,
-> industry-specific problem (e.g. "a regional grocery chain losing margin to
-> perishable-food stockouts"), never a vague "improve operations" framing. See
-> [`docs/project-brief.md`](docs/project-brief.md).
+> **Industry / customer problem:** Developer tools / B2B SaaS — a **freemium-to-Pro
+> AI code editor (Anysphere / Cursor archetype)** whose **Pro-tier subscribers
+> churn** with no unified daily signal to predict *who* will lapse in time to act.
+> This build is a **Developer Behavioral Analytics Platform for Retention and Churn
+> Prediction**: it ingests behavioral signals (active coding hours, AI-suggestion
+> acceptance rate, session frequency), scores each Pro user's churn propensity
+> daily, and triggers personalized CRM re-engagement to hold **monthly Pro churn
+> below the 4% target** (benchmark: **−15%** churn) while lifting reactivation
+> (**+22%**). See [`docs/project-brief.md`](docs/project-brief.md).
 
 ## The integrated journey
 
@@ -22,6 +27,13 @@ to the next:
 | 4. Intelligence | **ML or Gen AI** | The model that makes it intelligent |
 | 5. Ask | **Genie Room** | Natural-language querying over the governed data |
 | 6. Surface | **Databricks App** | Business-facing UI on top of it all |
+
+## Contribution workflow (non-negotiable)
+
+**All changes ship via a branch + pull request — never a direct commit to `main`.**
+Every PR requires **human review before merge**; the automation opens PRs but never
+merges them. Each build stage is implemented on its own branch and reviewed by an
+independent (different-vendor) reviewer before it goes up for human merge.
 
 ## Data policy (non-negotiable)
 
