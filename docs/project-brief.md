@@ -49,18 +49,49 @@ From the use case:
   use-case evidence note).
 - **Power user daily engagement threshold** — a daily-engagement bar used to
   define/segment power users (used as a model feature and a stickiness KPI).
-- Baseline → target: exact baseline churn and baseline reactivation rate are
-  **not stated** in the inputs _(assumption — confirm; needed for the deck's
-  before/after)_.
+
+### Illustrative baselines (chosen for this demo — NOT real Anysphere figures)
+No real baselines were available, so these are **illustrative synthetic values**,
+derived to be internally consistent with the given targets. They exist so the deck
+can tell a before→after story; **swap in real numbers if they ever surface.**
+
+| Metric | Baseline (illustrative) | Target | Basis |
+| --- | --- | --- | --- |
+| Pro-tier **monthly churn** | **4.7%** | **< 4.0%** | −15% relative reduction (given) lands ~4.0% |
+| **CRM reactivation rate** | **8.0%** | **9.8%** | +22% relative improvement (given) |
+| **Power-user daily-engagement threshold** | ≥ **4** active coding hours/day on ≥ **5** days/week | — | defines the "power user" segment |
+
+All three are tagged illustrative wherever they appear so nothing reads as a real
+customer metric.
 
 ## ROI model (given)
 - **Pattern:** Customer Revenue Expansion & Churn Prevention.
 - **ROI template (verbatim):**
   `Annual_Impact = ARR × NRR_Improvement% + Churn_Prevention × Customer_Base × LTV`
-- Inputs still needed to compute a dollar figure for the deck: **ARR**,
-  **NRR_Improvement%**, **Churn_Prevention** (rate), **Customer_Base**, **LTV**
-  _(assumption — none of these values are in the inputs yet; confirm or we label
-  the deck's dollar impact as illustrative synthetic)_.
+- Inputs needed to compute a dollar figure: **ARR**, **NRR_Improvement%**,
+  **Churn_Prevention** (rate), **Customer_Base**, **LTV**.
+
+### Illustrative ROI inputs (chosen for this demo — NOT real Anysphere figures)
+Coherent with the dataset volume below (50,000 Pro subscribers) and the churn
+targets. **Swap in real numbers if they surface.**
+
+| Input | Illustrative value | Basis |
+| --- | --- | --- |
+| **Customer_Base** (Pro subs) | **50,000** | matches synthetic dataset volume |
+| **Pro price** | **$20/mo → $240/yr** | round demo price point |
+| **ARR** | **$120,000,000** | 50,000 × $240 × 100% (all Pro) |
+| **LTV** | **$600** | $240/yr ÷ ~0.40 annual churn ≈ 2.5-yr life |
+| **NRR_Improvement%** | **2.0%** | expansion/retention lift from the program |
+| **Churn_Prevention** (annual rate reduction) | **0.6%** | ~4.7% → ~4.0% monthly ≈ 0.6-pt absolute |
+
+**Worked example (illustrative):**
+`Annual_Impact = ARR × NRR_Improvement% + Churn_Prevention × Customer_Base × LTV`
+`= $120,000,000 × 2.0% + 0.6% × 50,000 × $600`
+`= $2,400,000 + $180,000`
+`≈ $2.58M annual impact` _(illustrative)._
+
+Every figure here is illustrative and labeled as such wherever it appears in the
+deck or notebooks.
 
 ## Personas
 Primary (from the use case):
@@ -85,8 +116,29 @@ owners), **CTO**.
   dropping session frequency with higher churn; encode geographies (the use case
   calls out behavioral patterns evolving "across geographies"); include power
   users above the daily-engagement threshold.
-- **Schema / volume:** _(assumption — to be specified in the data-generation
-  task; propose ~N users over M months.)_
+- **Volume (chosen for this demo — illustrative):**
+  - **50,000 Pro-tier users**, matching the ROI `Customer_Base` above.
+  - **18 months** of daily history (~547 days) — long enough to show behavioral
+    decline preceding churn, seasonality, and retraining as patterns evolve.
+  - **Daily usage-event grain:** ~50k users × ~547 days ≈ **27M** daily activity
+    rows at full density; the generator emits only active-day rows, so real volume
+    is lower and tunable via a `--sample-frac` flag for fast/small demo runs.
+  - **~6 geographies** (e.g. NA, EMEA, APAC, LATAM, …) to exercise "patterns
+    evolving across geographies."
+  - **~4–6 CRM campaigns** with touch + outcome events feeding the reactivation KPI.
+- **Schema (tables the generator produces):**
+  - `users` — user_id, signup_date, geo, plan, tier, power_user_flag.
+  - `subscriptions` / `billing` — plan, price, renewals, downgrades, cancel_date
+    (asset **A03**).
+  - `usage_events` — daily coding hours, AI-suggestion acceptance rate, session
+    frequency (asset **A06**; the Structured Streaming / Lakeflow source).
+  - `feature_adoption` — stickiness-feature activation metrics (asset **A07**).
+  - `support_tickets` — tickets, chat volume, CSAT (asset **A14**).
+  - `crm_campaigns` / `crm_touches` — campaign sends, channel, reactivation outcome.
+  - `churn_labels` — per-user monthly churn label for supervised training.
+- **Reproducibility:** single fixed random seed committed; generator is
+  parameterized (user count, months, sample fraction, seed) so the whole dataset
+  regenerates deterministically from code.
 - **Data safety:** synthetic only; zero real customer data; enforced by
   `.gitignore` and reiterated in the requirements doc.
 
