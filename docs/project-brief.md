@@ -38,12 +38,29 @@ on a KPI dashboard rather than reacting to lapsed subscriptions.
 ## KPIs / quantified impact
 From the use case:
 - **Primary KPI — Pro-tier monthly churn rate.** Target: **below 4%** (given).
+  Benchmark improvement: **−15% churn rate** (given; LOE **Low**). Read these as
+  compatible framings, not a contradiction: **<4%** is the absolute target level;
+  **−15%** is the *relative* reduction the pattern is benchmarked to deliver
+  (i.e. this initiative is expected to cut churn ~15% vs. baseline, and the
+  program's target floor for Pro monthly churn is 4%). The implied baseline is
+  therefore **~4.7% monthly** if a 15% cut lands at 4% _(assumption — confirm the
+  baseline)_.
 - **CRM-driven reactivation rate improvement.** Target: **+22%** (given in the
   use-case evidence note).
 - **Power user daily engagement threshold** — a daily-engagement bar used to
   define/segment power users (used as a model feature and a stickiness KPI).
-- Baseline → target: baseline churn and baseline reactivation rate are **not in
-  the inputs** _(assumption — confirm; needed for the deck's before/after)_.
+- Baseline → target: exact baseline churn and baseline reactivation rate are
+  **not stated** in the inputs _(assumption — confirm; needed for the deck's
+  before/after)_.
+
+## ROI model (given)
+- **Pattern:** Customer Revenue Expansion & Churn Prevention.
+- **ROI template (verbatim):**
+  `Annual_Impact = ARR × NRR_Improvement% + Churn_Prevention × Customer_Base × LTV`
+- Inputs still needed to compute a dollar figure for the deck: **ARR**,
+  **NRR_Improvement%**, **Churn_Prevention** (rate), **Customer_Base**, **LTV**
+  _(assumption — none of these values are in the inputs yet; confirm or we label
+  the deck's dollar impact as illustrative synthetic)_.
 
 ## Personas
 Primary (from the use case):
@@ -72,6 +89,34 @@ owners), **CTO**.
   task; propose ~N users over M months.)_
 - **Data safety:** synthetic only; zero real customer data; enforced by
   `.gitignore` and reiterated in the requirements doc.
+
+### Data assets to model (from the use case)
+**Mission-critical (MC) — the churn-prediction core:**
+- **A03 — Subscription plans & billing history** (source systems: ERP/Billing,
+  Revenue Management, Data Warehouse) → tenure, payment history, downgrades.
+- **A06 — Raw product usage events & telemetry** (Event Bus, Product Analytics,
+  Data Lake) → the behavioral signal: coding hours, AI-acceptance, session
+  frequency. This is the Structured Streaming / Lakeflow ingest source.
+- **A07 — Feature adoption & activation metrics** (Analytics Marts, Feature
+  Store, Data Warehouse) → stickiness-feature adoption.
+- **A14 — Support tickets, chat logs & CSAT** (Support Platform, Chat, ITSM,
+  Data Warehouse) → support friction as a churn signal.
+
+**Value-add (VA) — enrichment for targeting/outreach:** persona, entitlements,
+marketing saturation, and unified identity — to tailor offers and pick the
+outreach channel. _(The use case references VA assets in the rationale but does
+not enumerate them individually; the four above are the explicitly listed MC
+assets.)_
+
+**Selection rationale (from the use case):** MC assets capture tenure, payment
+and downgrade history plus adoption of stickiness features and support friction
+to predict churn; VA assets enrich with persona, entitlements, marketing
+saturation and unified identity to tailor offers and outreach channel.
+
+**Why this use case matches the pattern (from the use case):** both focus on
+predicting churn risk at the user/account level using behavioral signals (coding
+hours, AI-suggestion acceptance) to orchestrate retention plays — ingesting
+activity signals to score churn probability and trigger interventions.
 
 ## Product / stage mapping (use-case products → FE Bar mandated journey)
 The use case names these products: **Lakebase, MLflow, Lakeflow Connect,
