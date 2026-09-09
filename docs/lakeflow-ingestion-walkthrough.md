@@ -37,12 +37,34 @@ gold    (aggregates / features consumed by ML, Lakebase, Genie, the app)
 
 ## Prerequisites (one-time)
 
-1. A Unity Catalog **catalog + schema** for the demo, e.g. `dev_churn.bronze`.
-2. A UC **Volume** to hold raw synthetic files, e.g.
-   `/Volumes/dev_churn/landing/raw/usage_events/`.
+1. A Unity Catalog **catalog** (`dev_churn`) with the schemas the pipeline writes
+   to — **`bronze`** and **`silver`** — plus a **`landing`** schema to hold the raw
+   files Volume.
+2. A UC **Volume** for raw synthetic files: `dev_churn.landing.raw`, giving the path
+   `/Volumes/dev_churn/landing/raw/`. Auto Loader also needs a schema-tracking
+   location — we keep it in a `_schemas/` **subdirectory of this same Volume**
+   (`/Volumes/dev_churn/landing/raw/_schemas/…`), so **no second Volume is needed**.
+   It sits beside the ingested `usage_events/` folder, so it is never re-ingested.
 3. Permission to create pipelines and streaming tables (UC required).
 4. The synthetic sample data from the data-generation stage (the generator's small
-   sample, committed to the repo under `data/` — we upload that to the Volume).
+   sample, generated locally under `data/` — we upload that to the Volume).
+
+Create them once (adjust the profile):
+
+```bash
+P=fevm-serverless-stable-yuzk83
+databricks schemas create bronze  dev_churn --profile $P
+databricks schemas create silver  dev_churn --profile $P
+databricks schemas create landing dev_churn --profile $P
+databricks volumes create dev_churn landing raw MANAGED --profile $P
+```
+
+> **Gotcha (2026-09-09):** every segment of a `/Volumes/<catalog>/<schema>/<volume>/…`
+> path up to the third element is a real UC object. Pointing `schemaLocation` at
+> `/Volumes/dev_churn/landing/_schemas/…` implies a **Volume** named `_schemas` that
+> doesn't exist and fails with *"Volume `dev_churn`.`landing`.`_schemas` does not
+> exist."* Keep the schema-tracking dir **inside** an existing Volume (a `_schemas/`
+> subdirectory of `raw`), as the steps below now do.
 
 ## Step 1 — Land the raw files in a UC Volume
 
@@ -72,7 +94,7 @@ SELECT
 FROM STREAM read_files(
   '/Volumes/dev_churn/landing/raw/usage_events/',
   format          => 'parquet',
-  schemaLocation  => '/Volumes/dev_churn/landing/_schemas/usage_events'
+  schemaLocation  => '/Volumes/dev_churn/landing/raw/_schemas/usage_events'
 );
 ```
 
@@ -97,7 +119,7 @@ def usage_events_raw():
         spark.readStream.format("cloudFiles")
         .option("cloudFiles.format", "parquet")
         .option("cloudFiles.schemaLocation",
-                "/Volumes/dev_churn/landing/_schemas/usage_events")
+                "/Volumes/dev_churn/landing/raw/_schemas/usage_events")
         .load("/Volumes/dev_churn/landing/raw/usage_events/")
     )
 ```
@@ -113,7 +135,9 @@ CREATE OR REFRESH STREAMING TABLE dev_churn.silver.usage_events
 (
   CONSTRAINT valid_user     EXPECT (user_id IS NOT NULL) ON VIOLATION DROP ROW,
   CONSTRAINT valid_hours    EXPECT (coding_hours BETWEEN 0 AND 24),
-  CONSTRAINT valid_accept   EXPECT (ai_suggestion_acceptance_rate BETWEEN 0 AND 1)
+  -- Expectations are evaluated against the SELECT's OUTPUT columns, so this must
+  -- use the aliased name `ai_acceptance_rate`, not the source `ai_suggestion_acceptance_rate`.
+  CONSTRAINT valid_accept   EXPECT (ai_acceptance_rate BETWEEN 0 AND 1)
 )
 AS
 SELECT
