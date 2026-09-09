@@ -4,14 +4,13 @@
 -- independent of seed, user count, month count or sample fraction.
 -- Regenerate with: python -m datagen --emit-ddl sql/unity_catalog.sql
 
-CREATE CATALOG IF NOT EXISTS dev_behavior;
-CREATE SCHEMA IF NOT EXISTS dev_behavior.bronze;
-CREATE SCHEMA IF NOT EXISTS dev_behavior.gold;
+CREATE CATALOG IF NOT EXISTS dev_churn;
+CREATE SCHEMA IF NOT EXISTS dev_churn.silver;
 
 -- users: The Pro-tier user dimension: signup, geography, persona and the power-user flag derived from observed daily engagement.
 --   data asset: VA (identity / persona / entitlements)
 --   grain: one row per Pro-tier user
-CREATE TABLE IF NOT EXISTS dev_behavior.bronze.users (
+CREATE TABLE IF NOT EXISTS dev_churn.silver.users (
   user_id STRING NOT NULL COMMENT 'Synthetic surrogate user key, `USR-########`.',
   signup_date DATE NOT NULL COMMENT 'Date the user first became a Pro subscriber.',
   geo STRING NOT NULL COMMENT 'Region code: NA, EMEA, APAC, LATAM, MEA, ANZ.',
@@ -30,12 +29,12 @@ USING DELTA
 PARTITIONED BY (geo)
 COMMENT 'The Pro-tier user dimension: signup, geography, persona and the power-user flag derived from observed daily engagement.'
 ;
-ALTER TABLE dev_behavior.bronze.users ADD CONSTRAINT users_pk PRIMARY KEY (user_id);
+ALTER TABLE dev_churn.silver.users ADD CONSTRAINT users_pk PRIMARY KEY (user_id);
 
 -- subscriptions: Subscription lifecycle and billing history: signup, renewals, downgrades and cancellation, with recognised revenue per term.
 --   data asset: A03 — subscription plans & billing history
 --   grain: one row per subscription term (a plan a user held for a period)
-CREATE TABLE IF NOT EXISTS dev_behavior.bronze.subscriptions (
+CREATE TABLE IF NOT EXISTS dev_churn.silver.subscriptions (
   subscription_id STRING NOT NULL COMMENT 'Surrogate key, `SUB-#########`.',
   user_id STRING NOT NULL COMMENT 'FK to `users.user_id`.',
   plan_id STRING NOT NULL COMMENT 'Plan held during this term.',
@@ -59,13 +58,13 @@ CREATE TABLE IF NOT EXISTS dev_behavior.bronze.subscriptions (
 USING DELTA
 COMMENT 'Subscription lifecycle and billing history: signup, renewals, downgrades and cancellation, with recognised revenue per term.'
 ;
-ALTER TABLE dev_behavior.bronze.subscriptions ADD CONSTRAINT subscriptions_pk PRIMARY KEY (subscription_id);
-ALTER TABLE dev_behavior.bronze.subscriptions ADD CONSTRAINT subscriptions_user_id_fk FOREIGN KEY (user_id) REFERENCES dev_behavior.bronze.users(user_id);
+ALTER TABLE dev_churn.silver.subscriptions ADD CONSTRAINT subscriptions_pk PRIMARY KEY (subscription_id);
+ALTER TABLE dev_churn.silver.subscriptions ADD CONSTRAINT subscriptions_user_id_fk FOREIGN KEY (user_id) REFERENCES dev_churn.silver.users(user_id);
 
 -- usage_events: The daily behavioural signal and the Structured Streaming / Lakeflow ingest source: active coding hours, AI-suggestion acceptance rate and session frequency. Only active days are emitted, so row count is well below users x days.
 --   data asset: A06 — raw product usage events & telemetry
 --   grain: one row per user per ACTIVE day (inactive days are not emitted)
-CREATE TABLE IF NOT EXISTS dev_behavior.bronze.usage_events (
+CREATE TABLE IF NOT EXISTS dev_churn.silver.usage_events (
   event_date DATE NOT NULL COMMENT 'Activity date (partition column).',
   user_id STRING NOT NULL COMMENT 'FK to `users.user_id`.',
   geo STRING NOT NULL COMMENT 'Denormalised region code for partition pruning.',
@@ -83,13 +82,13 @@ USING DELTA
 PARTITIONED BY (event_date)
 COMMENT 'The daily behavioural signal and the Structured Streaming / Lakeflow ingest source: active coding hours, AI-suggestion acceptance rate and session frequency. Only active days are emitted, so row count is well below users x days.'
 ;
-ALTER TABLE dev_behavior.bronze.usage_events ADD CONSTRAINT usage_events_pk PRIMARY KEY (user_id, event_date);
-ALTER TABLE dev_behavior.bronze.usage_events ADD CONSTRAINT usage_events_user_id_fk FOREIGN KEY (user_id) REFERENCES dev_behavior.bronze.users(user_id);
+ALTER TABLE dev_churn.silver.usage_events ADD CONSTRAINT usage_events_pk PRIMARY KEY (user_id, event_date);
+ALTER TABLE dev_churn.silver.usage_events ADD CONSTRAINT usage_events_user_id_fk FOREIGN KEY (user_id) REFERENCES dev_churn.silver.users(user_id);
 
 -- feature_adoption: Monthly adoption and activation intensity for the stickiness features. Adoption suppresses churn hazard, so this is a first-class model input.
 --   data asset: A07 — feature adoption & activation metrics
 --   grain: one row per user per feature per month
-CREATE TABLE IF NOT EXISTS dev_behavior.bronze.feature_adoption (
+CREATE TABLE IF NOT EXISTS dev_churn.silver.feature_adoption (
   month_start DATE NOT NULL COMMENT 'First day of the calendar month.',
   user_id STRING NOT NULL COMMENT 'FK to `users.user_id`.',
   feature_key STRING NOT NULL COMMENT 'Stable feature identifier.',
@@ -105,13 +104,13 @@ USING DELTA
 PARTITIONED BY (month_start)
 COMMENT 'Monthly adoption and activation intensity for the stickiness features. Adoption suppresses churn hazard, so this is a first-class model input.'
 ;
-ALTER TABLE dev_behavior.bronze.feature_adoption ADD CONSTRAINT feature_adoption_pk PRIMARY KEY (user_id, feature_key, month_start);
-ALTER TABLE dev_behavior.bronze.feature_adoption ADD CONSTRAINT feature_adoption_user_id_fk FOREIGN KEY (user_id) REFERENCES dev_behavior.bronze.users(user_id);
+ALTER TABLE dev_churn.silver.feature_adoption ADD CONSTRAINT feature_adoption_pk PRIMARY KEY (user_id, feature_key, month_start);
+ALTER TABLE dev_churn.silver.feature_adoption ADD CONSTRAINT feature_adoption_user_id_fk FOREIGN KEY (user_id) REFERENCES dev_churn.silver.users(user_id);
 
 -- support_tickets: Support friction as a churn signal: ticket volume, chat message volume, handling time and CSAT. Volume rises as engagement declines.
 --   data asset: A14 — support tickets, chat logs & CSAT
 --   grain: one row per support ticket
-CREATE TABLE IF NOT EXISTS dev_behavior.bronze.support_tickets (
+CREATE TABLE IF NOT EXISTS dev_churn.silver.support_tickets (
   ticket_id STRING NOT NULL COMMENT 'Surrogate key, `TCK-#########`.',
   user_id STRING NOT NULL COMMENT 'FK to `users.user_id`.',
   created_date DATE NOT NULL COMMENT 'Date the ticket was opened.',
@@ -129,13 +128,13 @@ CREATE TABLE IF NOT EXISTS dev_behavior.bronze.support_tickets (
 USING DELTA
 COMMENT 'Support friction as a churn signal: ticket volume, chat message volume, handling time and CSAT. Volume rises as engagement declines.'
 ;
-ALTER TABLE dev_behavior.bronze.support_tickets ADD CONSTRAINT support_tickets_pk PRIMARY KEY (ticket_id);
-ALTER TABLE dev_behavior.bronze.support_tickets ADD CONSTRAINT support_tickets_user_id_fk FOREIGN KEY (user_id) REFERENCES dev_behavior.bronze.users(user_id);
+ALTER TABLE dev_churn.silver.support_tickets ADD CONSTRAINT support_tickets_pk PRIMARY KEY (ticket_id);
+ALTER TABLE dev_churn.silver.support_tickets ADD CONSTRAINT support_tickets_user_id_fk FOREIGN KEY (user_id) REFERENCES dev_churn.silver.users(user_id);
 
 -- crm_campaigns: Campaign dimension: objective, channel, target segment, budget, run dates.
 --   data asset: VA (marketing saturation / campaign metadata)
 --   grain: one row per CRM campaign
-CREATE TABLE IF NOT EXISTS dev_behavior.bronze.crm_campaigns (
+CREATE TABLE IF NOT EXISTS dev_churn.silver.crm_campaigns (
   campaign_id STRING NOT NULL COMMENT 'Campaign key, `CMP-###`.',
   campaign_name STRING NOT NULL COMMENT 'Human-readable campaign name.',
   objective STRING NOT NULL COMMENT '`retention`, `winback`, `adoption` or `expansion`.',
@@ -150,12 +149,12 @@ CREATE TABLE IF NOT EXISTS dev_behavior.bronze.crm_campaigns (
 USING DELTA
 COMMENT 'Campaign dimension: objective, channel, target segment, budget, run dates.'
 ;
-ALTER TABLE dev_behavior.bronze.crm_campaigns ADD CONSTRAINT crm_campaigns_pk PRIMARY KEY (campaign_id);
+ALTER TABLE dev_churn.silver.crm_campaigns ADD CONSTRAINT crm_campaigns_pk PRIMARY KEY (campaign_id);
 
 -- crm_touches: Individual campaign sends and their outcome. `outcome = 'reactivated'` is the numerator of the CRM reactivation-rate KPI.
 --   data asset: VA (CRM touch + reactivation outcome)
 --   grain: one row per campaign touch sent to a user
-CREATE TABLE IF NOT EXISTS dev_behavior.bronze.crm_touches (
+CREATE TABLE IF NOT EXISTS dev_churn.silver.crm_touches (
   touch_id STRING NOT NULL COMMENT 'Surrogate key, `TCH-##########`.',
   campaign_id STRING NOT NULL COMMENT 'FK to `crm_campaigns.campaign_id`.',
   user_id STRING NOT NULL COMMENT 'FK to `users.user_id`.',
@@ -174,14 +173,14 @@ USING DELTA
 PARTITIONED BY (touch_date)
 COMMENT 'Individual campaign sends and their outcome. `outcome = ''reactivated''` is the numerator of the CRM reactivation-rate KPI.'
 ;
-ALTER TABLE dev_behavior.bronze.crm_touches ADD CONSTRAINT crm_touches_pk PRIMARY KEY (touch_id);
-ALTER TABLE dev_behavior.bronze.crm_touches ADD CONSTRAINT crm_touches_user_id_fk FOREIGN KEY (user_id) REFERENCES dev_behavior.bronze.users(user_id);
-ALTER TABLE dev_behavior.bronze.crm_touches ADD CONSTRAINT crm_touches_campaign_id_fk FOREIGN KEY (campaign_id) REFERENCES dev_behavior.bronze.crm_campaigns(campaign_id);
+ALTER TABLE dev_churn.silver.crm_touches ADD CONSTRAINT crm_touches_pk PRIMARY KEY (touch_id);
+ALTER TABLE dev_churn.silver.crm_touches ADD CONSTRAINT crm_touches_user_id_fk FOREIGN KEY (user_id) REFERENCES dev_churn.silver.users(user_id);
+ALTER TABLE dev_churn.silver.crm_touches ADD CONSTRAINT crm_touches_campaign_id_fk FOREIGN KEY (campaign_id) REFERENCES dev_churn.silver.crm_campaigns(campaign_id);
 
 -- churn_labels: Per-user monthly churn label. `churned = TRUE` means the user was an active subscriber on the first day of the month and canceled during it. Rows only exist for months the user was at risk, so AVG(churned) is the monthly churn rate directly.
 --   data asset: derived label (gold) — supervised training target
 --   grain: one row per user per month the user was a subscriber at month start
-CREATE TABLE IF NOT EXISTS dev_behavior.gold.churn_labels (
+CREATE TABLE IF NOT EXISTS dev_churn.silver.churn_labels (
   month_start DATE NOT NULL COMMENT 'First day of the observation month.',
   user_id STRING NOT NULL COMMENT 'FK to `users.user_id`.',
   geo STRING NOT NULL COMMENT 'Denormalised region code.',
@@ -202,6 +201,6 @@ USING DELTA
 PARTITIONED BY (month_start)
 COMMENT 'Per-user monthly churn label. `churned = TRUE` means the user was an active subscriber on the first day of the month and canceled during it. Rows only exist for months the user was at risk, so AVG(churned) is the monthly churn rate directly.'
 ;
-ALTER TABLE dev_behavior.gold.churn_labels ADD CONSTRAINT churn_labels_pk PRIMARY KEY (user_id, month_start);
-ALTER TABLE dev_behavior.gold.churn_labels ADD CONSTRAINT churn_labels_user_id_fk FOREIGN KEY (user_id) REFERENCES dev_behavior.bronze.users(user_id);
+ALTER TABLE dev_churn.silver.churn_labels ADD CONSTRAINT churn_labels_pk PRIMARY KEY (user_id, month_start);
+ALTER TABLE dev_churn.silver.churn_labels ADD CONSTRAINT churn_labels_user_id_fk FOREIGN KEY (user_id) REFERENCES dev_churn.silver.users(user_id);
 
