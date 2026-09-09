@@ -152,9 +152,14 @@ FROM STREAM dev_churn.bronze.usage_events_raw;
 
 ## Step 4 — Create and run the pipeline
 
-In the workspace sidebar go to **Jobs & Pipelines → Create → ETL pipeline**, point
-it at your source folder, set the target catalog `dev_churn`, choose **serverless**,
-and run.
+In the workspace sidebar go to **Jobs & Pipelines → Create → ETL pipeline**. The
+wizard **scaffolds a source-code folder for you** — a folder in your workspace (e.g.
+`/Workspace/Users/<you>/<pipeline-name>/`) with a `transformations/` subfolder and
+the starter `my_transformations.py`. That folder *is* the pipeline: Lakeflow runs
+every table definition under it, so you don't point it anywhere by hand — you just
+edit the file it created. (You can see or change the folder later under **Settings →
+Source code**, e.g. to add repo files.) Set the default catalog to `dev_churn`,
+choose **serverless**, and run.
 
 **Choose `ETL pipeline`, not `Ingestion pipeline`** — the two are different Lakeflow
 entry points:
