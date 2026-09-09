@@ -13,8 +13,9 @@ Per-entry keys:
 
 The `select` cast lists are derived from `src/datagen/schemas.py` (the generator's
 single source of truth), so silver types stay in lockstep with the emitted data.
-`usage_events` is handled by the separate `usage_events_ingest` pipeline and must
-not be duplicated here (a table can only be owned by one pipeline).
+This pipeline owns `usage_events` too: the standalone `usage_events_ingest` pipeline
+has been retired (its definitions are commented out), so a table is still owned by
+exactly one pipeline.
 """
 
 TABLES = [
