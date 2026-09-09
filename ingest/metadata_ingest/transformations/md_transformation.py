@@ -8,7 +8,8 @@ def build(spec):                       # factory = clean per-table closure
     name = spec["name"]
 
     @dp.table(name=f"dev_churn.bronze.{name}_raw",
-              comment=f"raw {name} via Auto Loader")
+              comment=f"raw {name} via Auto Loader",
+              table_properties={"delta.feature.timestampNtz": "supported"})
     def _bronze(spec=spec, name=name):
         return (spark.readStream.format("cloudFiles")
                 .option("cloudFiles.format", spec["format"])

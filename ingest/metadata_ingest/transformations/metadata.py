@@ -13,8 +13,8 @@ Per-entry keys:
 
 The `select` cast lists are derived from `src/datagen/schemas.py` (the generator's
 single source of truth), so silver types stay in lockstep with the emitted data.
-`usage_events` is kept identical to the hard-coded `usage_events_ingest` pipeline's
-curated silver, because both pipelines write the same `dev_churn.silver.usage_events`.
+`usage_events` is handled by the separate `usage_events_ingest` pipeline and must
+not be duplicated here (a table can only be owned by one pipeline).
 """
 
 TABLES = [
@@ -70,25 +70,6 @@ TABLES = [
         "expect_keep": {
             "valid_mrr": "mrr_usd >= 0",
             "valid_billing": "billing_period IN ('monthly','annual')",
-        },
-    },
-    {
-        # Kept identical to the hard-coded usage_events_ingest pipeline's silver:
-        # both write dev_churn.silver.usage_events, so the projection must match.
-        "name": "usage_events",
-        "format": "parquet",
-        "select": [
-            "CAST(user_id AS STRING) AS user_id",
-            "CAST(event_date AS DATE) AS event_date",
-            "CAST(coding_hours AS DOUBLE) AS coding_hours",
-            "CAST(ai_suggestion_acceptance_rate AS DOUBLE) AS ai_acceptance_rate",
-            "CAST(session_frequency AS INT) AS session_frequency",
-            "geo",
-        ],
-        "expect_drop": {"valid_user": "user_id IS NOT NULL"},
-        "expect_keep": {
-            "valid_hours": "coding_hours BETWEEN 0 AND 24",
-            "valid_accept": "ai_acceptance_rate BETWEEN 0 AND 1",
         },
     },
     {
@@ -208,5 +189,22 @@ TABLES = [
         ],
         "expect_drop": {"valid_user": "user_id IS NOT NULL"},
         "expect_keep": {"valid_tenure": "tenure_months >= 0"},
+    },
+        {
+        "name": "usage_events",
+        "format": "parquet",
+        "select": [
+            "CAST(user_id AS STRING) AS user_id",
+            "CAST(event_date AS DATE) AS event_date",
+            "CAST(coding_hours AS DOUBLE) AS coding_hours",
+            "CAST(ai_suggestion_acceptance_rate AS DOUBLE) AS ai_acceptance_rate",
+            "CAST(session_frequency AS INT) AS session_frequency",
+            "geo",
+        ],
+        "expect_drop": {"valid_user": "user_id IS NOT NULL"},
+        "expect_keep": {
+            "valid_hours": "coding_hours BETWEEN 0 AND 24",
+            "valid_accept": "ai_acceptance_rate BETWEEN 0 AND 1",
+        },
     },
 ]
