@@ -152,10 +152,100 @@ FROM STREAM dev_churn.bronze.usage_events_raw;
 
 ## Step 4 — Create and run the pipeline
 
-- UI: **Workflows → Pipelines → Create pipeline**, point it at your `pipelines/`
-  source folder, set the target catalog `dev_churn`, choose **serverless**, run.
-- Or Asset Bundle (so it's reproducible from the repo) — a `databricks.yml`
-  declares the pipeline; `databricks bundle deploy && databricks bundle run`.
+**Pipeline type: choose `ETL pipeline`** in the Create-pipeline dialog — *not*
+`Ingestion pipeline`. The two are different Lakeflow entry points:
+
+| UI choice | What it is | Use it when |
+| --- | --- | --- |
+| **ETL pipeline** ✅ | **Lakeflow Declarative Pipelines** (formerly DLT). You author the bronze/silver/gold tables yourself in SQL or Python. | Our case: Auto Loader over synthetic files in a Volume, declared in code. |
+| Ingestion pipeline | **Lakeflow Connect** — a guided *managed connector* (Salesforce, Workday, SQL Server/Postgres CDC…). No code; you pick a source system. | Only if you were pulling CRM live from Salesforce/a DB instead of files. |
+
+### What the ETL wizard scaffolds
+
+Creating an ETL pipeline lays down a source folder with a `transformations/`
+directory and a starter file — for a Python pipeline that's **`my_transformations.py`**
+(blank, or a commented sample). You put your table definitions there; every
+`@dp.table` function across the files in that folder becomes a node in the DAG.
+You can rename the file or add more — the pipeline reads the whole folder.
+
+### Paste this into `my_transformations.py`
+
+One file defines the whole `usage_events` chain — bronze (Auto Loader) → silver
+(typed + quality-checked). Table names are **fully qualified** so bronze and silver
+land in different schemas regardless of the pipeline's default schema:
+
+```python
+from pyspark import pipelines as dp
+from pyspark.sql.functions import col, current_timestamp
+
+# ---- Bronze: raw A06 telemetry, ingested incrementally via Auto Loader ----
+@dp.table(
+    name="dev_churn.bronze.usage_events_raw",
+    comment="A06 raw developer-behavior telemetry via Auto Loader",
+)
+def usage_events_raw():
+    return (
+        spark.readStream.format("cloudFiles")
+        .option("cloudFiles.format", "parquet")
+        .option("cloudFiles.schemaLocation",
+                "/Volumes/dev_churn/landing/raw/_schemas/usage_events")
+        .load("/Volumes/dev_churn/landing/raw/usage_events/")
+        # cheap, high-value lineage/debug breadcrumbs
+        .withColumn("_source_file", col("_metadata.file_path"))
+        .withColumn("_ingested_at", current_timestamp())
+    )
+
+# ---- Silver: typed + quality-checked ----
+# Expectations bind to this function's OUTPUT columns, so valid_accept references
+# the aliased `ai_acceptance_rate`, not the source `ai_suggestion_acceptance_rate`.
+@dp.table(
+    name="dev_churn.silver.usage_events",
+    comment="A06 cleaned/typed telemetry with data-quality expectations",
+)
+@dp.expect_all_or_drop({"valid_user": "user_id IS NOT NULL"})
+@dp.expect_all({
+    "valid_hours":  "coding_hours BETWEEN 0 AND 24",
+    "valid_accept": "ai_acceptance_rate BETWEEN 0 AND 1",
+})
+def usage_events():
+    return (
+        spark.readStream.table("dev_churn.bronze.usage_events_raw")
+        .selectExpr(
+            "CAST(user_id AS STRING)                       AS user_id",
+            "CAST(event_date AS DATE)                      AS event_date",
+            "CAST(coding_hours AS DOUBLE)                  AS coding_hours",
+            "CAST(ai_suggestion_acceptance_rate AS DOUBLE) AS ai_acceptance_rate",
+            "CAST(session_frequency AS INT)                AS session_frequency",
+            "geo",
+        )
+    )
+```
+
+> `event_date` is the Hive partition column in the landing path
+> (`…/usage_events/event_date=YYYY-MM-DD/…`); Auto Loader infers it automatically,
+> so it's present in bronze without being in the file body.
+>
+> `@dp.expect_all_or_drop` **drops** violating rows (a NULL `user_id` is unusable);
+> `@dp.expect_all` only **records** violations as metrics and keeps the rows — both
+> pass/fail counts land in the event log for Step 5's evidence. The equivalent SQL
+> in Steps 2–3 uses `ON VIOLATION DROP ROW` vs. a bare `EXPECT`.
+
+### Pipeline settings
+
+- **Serverless**: on.
+- **Default catalog**: `dev_churn`; **default schema**: `bronze` (unqualified table
+  names would land here — ours are fully qualified, so this is just the fallback).
+- **Source code**: the folder containing `my_transformations.py` (the wizard sets
+  this to the scaffolded folder already).
+
+Then **Validate** (dry-run: resolves the DAG and schemas without writing), then
+**Run**.
+
+### Reproducible-from-repo alternative (Asset Bundle)
+
+Instead of the UI, a `databricks.yml` can declare the pipeline so it lives in git:
+`databricks bundle deploy && databricks bundle run`. Same `my_transformations.py`;
+the bundle just owns the pipeline's settings.
 
 On the first run you'll see the DAG: `usage_events_raw` → `usage_events`, with row
 counts and expectation pass rates per table.
