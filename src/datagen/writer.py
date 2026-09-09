@@ -148,7 +148,18 @@ def _write_files(frame: pd.DataFrame, target: Path, output_format: str) -> list[
     written: list[Path] = []
     if output_format in ("parquet", "both"):
         path = target / "part-00000.parquet"
-        frame.to_parquet(path, index=False, engine="pyarrow", compression="snappy")
+        # Coerce timestamps to microseconds. pandas date columns are datetime64[ns],
+        # which pyarrow serialises as Parquet TIMESTAMP(NANOS); Spark's Parquet reader
+        # rejects that with PARQUET_TYPE_ILLEGAL. Our values are day-precision, so the
+        # truncation to micros is lossless.
+        frame.to_parquet(
+            path,
+            index=False,
+            engine="pyarrow",
+            compression="snappy",
+            coerce_timestamps="us",
+            allow_truncated_timestamps=True,
+        )
         written.append(path)
     if output_format in ("csv", "both"):
         path = target / "part-00000.csv"
