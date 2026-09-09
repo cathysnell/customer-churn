@@ -289,6 +289,23 @@ Same pattern per source, with the right connector/format:
   sentence in the deck to show you know the managed-connector path.
 - `churn_labels`: ingest as a batch/materialized view; it's derived, not streamed.
 
+### Optional: make it metadata-driven
+
+Rather than copy `my_transformations.py` per source, you can drive the whole set
+from **metadata**. Every table shares the same bronze shape (Auto Loader over a
+Volume folder) and differs only in a few values — source name, format, the
+silver casts/renames, and its expectations. Describe each source as a dict entry
+and loop over the list, generating the bronze + silver `@dp.table` definitions
+programmatically (the pipeline file runs at graph-resolution time, so a `for` loop
+creates real DAG nodes). Adding a source then becomes a config entry, not new code.
+
+Two things to know: bind the loop variable per iteration (a factory function or
+default-arg capture) or every generated table closes over the *last* spec; and
+carry a `mode` flag so `churn_labels` can be batch while the rest stream. The
+per-table column/cast metadata can even be **derived from `src/datagen/schemas.py`**
+(the generator's single source of truth), keeping ingest DRY with the data itself.
+It's also a strong "metadata-driven ingestion framework" point for the deck.
+
 ## Where this hands off next
 
 - **Unity Catalog (Stage 2)** governs everything we just created (it already does —
