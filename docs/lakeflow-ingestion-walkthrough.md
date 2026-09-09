@@ -152,8 +152,12 @@ FROM STREAM dev_churn.bronze.usage_events_raw;
 
 ## Step 4 — Create and run the pipeline
 
-**Pipeline type: choose `ETL pipeline`** in the Create-pipeline dialog — *not*
-`Ingestion pipeline`. The two are different Lakeflow entry points:
+In the workspace sidebar go to **Jobs & Pipelines → Create → ETL pipeline**, point
+it at your source folder, set the target catalog `dev_churn`, choose **serverless**,
+and run.
+
+**Choose `ETL pipeline`, not `Ingestion pipeline`** — the two are different Lakeflow
+entry points:
 
 | UI choice | What it is | Use it when |
 | --- | --- | --- |
