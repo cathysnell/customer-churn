@@ -122,22 +122,34 @@ with mlflow.start_run(run_name="churn-histgbt") as run:
           f"base rate={y_valid.mean():.4f}")
 
     signature = infer_signature(X_valid, p_valid)
-    mlflow.sklearn.log_model(
+    model_info = mlflow.sklearn.log_model(
         pipeline,
         artifact_path="model",
         signature=signature,
         input_example=X_valid.head(3),
         registered_model_name=MODEL_NAME,
+        # Recent MLflow defaults to skops serialization, which refuses to persist
+        # numpy.dtype and the ColumnTransformer remainder ("passthrough") list without
+        # an explicit trusted-types allowlist. cloudpickle is the robust format here
+        # and doesn't need the model's internal types enumerated.
+        serialization_format="cloudpickle",
     )
     run_id = run.info.run_id
 
 # COMMAND ----------
 # 4. Promote the just-registered version to @champion (the alias score_churn.py loads).
+# Read the version straight off the log_model result — the UC registry's
+# search_model_versions only supports a `name = '...'` filter (no run_id clause), so
+# don't search; fall back to a name-only search + run_id match only if needed.
 from mlflow.tracking import MlflowClient
 
 client = MlflowClient(registry_uri="databricks-uc")
-versions = client.search_model_versions(f"name='{MODEL_NAME}' and run_id='{run_id}'")
-new_version = max(int(v.version) for v in versions)
+new_version = getattr(model_info, "registered_model_version", None)
+if new_version is None:
+    cands = [v for v in client.search_model_versions(f"name = '{MODEL_NAME}'")
+             if v.run_id == run_id]
+    new_version = max(int(v.version) for v in cands)
+new_version = int(new_version)
 client.set_registered_model_alias(MODEL_NAME, CHAMPION_ALIAS, new_version)
 client.update_model_version(
     MODEL_NAME, new_version,
