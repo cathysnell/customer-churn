@@ -179,9 +179,10 @@ def test_unity_catalog_ddl_covers_every_table() -> None:
             assert column.name in ddl
     assert "USING DELTA" in ddl
     assert "CREATE CATALOG IF NOT EXISTS" in ddl
-    # Gold-layer tables land in the gold schema, not bronze.
-    assert "gold.churn_labels" in ddl
-    assert "bronze.usage_events" in ddl
+    # Every table is registered in the governed silver schema (matches the
+    # deployed dev_churn.silver layer).
+    assert "dev_churn.silver.churn_labels" in ddl
+    assert "dev_churn.silver.usage_events" in ddl
 
 
 def test_unity_catalog_ddl_declares_keys() -> None:

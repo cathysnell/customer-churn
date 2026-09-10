@@ -34,10 +34,13 @@ from datagen.config import GeneratorConfig
 LOGGER = logging.getLogger("datagen.writer")
 
 #: Target catalog/schema for the Unity Catalog stage. Declared here so the DDL
-#: this module emits and the later UC stage agree on one name.
-UC_CATALOG = "dev_behavior"
-UC_SCHEMA = "bronze"
-UC_GOLD_SCHEMA = "gold"
+#: this module emits and the later UC stage agree on one name. These match the
+#: deployed Lakeflow pipeline: the governed, typed tables all live in
+#: ``dev_churn.silver`` (the bronze ``*_raw`` tables are Auto Loader landing
+#: internals and are not part of this registration intent).
+UC_CATALOG = "dev_churn"
+UC_SCHEMA = "silver"
+UC_GOLD_SCHEMA = "silver"
 
 
 def write_all(
@@ -192,9 +195,10 @@ def unity_catalog_ddl(config: GeneratorConfig | None = None) -> str:
         "",
         f"CREATE CATALOG IF NOT EXISTS {UC_CATALOG};",
         f"CREATE SCHEMA IF NOT EXISTS {UC_CATALOG}.{UC_SCHEMA};",
-        f"CREATE SCHEMA IF NOT EXISTS {UC_CATALOG}.{UC_GOLD_SCHEMA};",
-        "",
     ]
+    if UC_GOLD_SCHEMA != UC_SCHEMA:
+        lines.append(f"CREATE SCHEMA IF NOT EXISTS {UC_CATALOG}.{UC_GOLD_SCHEMA};")
+    lines.append("")
 
     for spec in schemas.TABLES:
         schema_name = UC_GOLD_SCHEMA if spec.layer == "gold" else UC_SCHEMA
