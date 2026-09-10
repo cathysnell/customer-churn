@@ -35,11 +35,13 @@ phrasing.
 
 ## Answer SQL (validated 2026-09-10)
 
-**1 — Latest monthly churn rate** → `0.0325`
+**1 — Latest monthly churn rate** → `2026-08-01 | 0.0325`
 ```sql
-SELECT MEASURE(`Churn rate`) AS churn_rate
+SELECT `Month`, MEASURE(`Churn rate`) AS churn_rate
 FROM dev_churn.gold.churn_metrics_monthly
-WHERE `Month` = (SELECT MAX(month_start) FROM dev_churn.silver.churn_labels);
+GROUP BY `Month`
+ORDER BY `Month` DESC
+LIMIT 1;
 ```
 
 **2 — Churn trend month over month** → 18 rows, 0.0556 (2025-03) → 0.0325 (2026-08)
@@ -70,7 +72,7 @@ ORDER BY mrr_at_risk DESC;
 ```sql
 SELECT `Geo`, MEASURE(`Churn rate`) AS churn_rate
 FROM dev_churn.gold.churn_metrics_monthly
-WHERE `Month` = (SELECT MAX(month_start) FROM dev_churn.silver.churn_labels)
+WHERE `Month` = (SELECT MAX(`Month`) FROM dev_churn.gold.churn_metrics_monthly)
 GROUP BY `Geo`
 ORDER BY churn_rate DESC;
 ```
