@@ -1,5 +1,10 @@
 # Databricks notebook source
-# Stage 3 serving — serverless reverse ETL: dev_churn.gold.churn_serving -> Lakebase Postgres.
+# Serverless reverse ETL: a governed gold table -> Lakebase Postgres.
+#
+# Introduced in Stage 3 to sync dev_churn.gold.churn_serving; parameterized in Stage 4
+# so the same notebook also syncs dev_churn.gold.churn_predictions. The source/target/
+# PK come from job parameters (widgets) that DEFAULT to the Stage-3 churn_serving sync,
+# so the Stage-3 job runs unchanged.
 #
 # Runs as a serverless NOTEBOOK job (this workspace's metastore has no storage root,
 # so the managed UC synced-table pipeline — classic compute — fails with
@@ -25,11 +30,16 @@ import time
 import psycopg
 from databricks.sdk import WorkspaceClient
 
-SOURCE_TABLE = "dev_churn.gold.churn_serving"
+# Job parameters — default to the Stage-3 churn_serving sync so that job is unchanged.
+dbutils.widgets.text("source_table", "dev_churn.gold.churn_serving")  # noqa: F821
+dbutils.widgets.text("target_table", "public.churn_serving")  # noqa: F821
+dbutils.widgets.text("pk", "user_id")  # noqa: F821
+
+SOURCE_TABLE = dbutils.widgets.get("source_table")  # noqa: F821
+TARGET_TABLE = dbutils.widgets.get("target_table")  # noqa: F821
+PK = dbutils.widgets.get("pk")  # noqa: F821
 ENDPOINT = "projects/dev-churn-serving/branches/production/endpoints/primary"
 PG_DATABASE = "databricks_postgres"
-TARGET_TABLE = "public.churn_serving"
-PK = "user_id"
 
 _PG_TYPE = {
     "string": "TEXT", "boolean": "BOOLEAN", "date": "DATE",
