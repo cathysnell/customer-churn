@@ -37,8 +37,10 @@ the workspace:
 | **Join relationship (FK)** | `churn_predictions.user_id → churn_serving.user_id` | UC-declared, so Genie joins the two deterministically (baked into `ml/score_churn.py`) |
 | **Benchmarks** | [`benchmarks.md`](benchmarks.md) | Accuracy unit-tests; catch regressions after instruction/metric changes |
 
-Add the two metric views (and optionally the functions) to the space as **data
-sources / trusted assets** — they're the primary things Genie should reason over.
+The two metric views are wired into the space as **data sources** and both functions
+are registered as **trusted assets** (live as of 2026-09-10) — they're the primary
+things Genie reasons over. The curated example queries were correspondingly moved to
+the `MEASURE()` / function forms so examples and the metric-view answers agree.
 
 The **knowledge store** (per-column synonyms + entity matching) is UI-only — it isn't
 in `serialized_space`, so it's captured only by `get-space`. [`knowledge_store.md`](knowledge_store.md)
@@ -53,7 +55,7 @@ the data doesn't contain ("Europe" → `EMEA`) are handled by the instructions a
 | File | Where it goes in the space |
 | --- | --- |
 | [`instructions.md`](instructions.md) | **Instructions** — business definitions, the value-word aliases, the `churn_score`-is-a-ranking caveat, and the join rules |
-| [`example_queries.sql`](example_queries.sql) | **SQL queries** — 10 curated/"trusted" queries that teach Genie the joins; validated live 2026-09-10 |
+| [`example_queries.sql`](example_queries.sql) | **SQL queries** — 11 curated/"trusted" queries (synced from the live space; metric-view / function forms where possible). Re-sync: `genie get-space <id> --include-serialized-space` |
 | [`sample_questions.md`](sample_questions.md) | **Sample questions** — starter chips + a demo flow, with verified answers |
 | [`knowledge_store.md`](knowledge_store.md) | **Column synonyms + entity matching** (per-column, UI-only) — the reviewable record of what to enter in each column dialog |
 

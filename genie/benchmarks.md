@@ -7,9 +7,10 @@ pytest suite the rest of the repo uses.
 
 Each answer below is the **metric-view / function form** — what a well-curated space
 should resolve to — and every one was **executed live on the workspace 2026-09-10**
-(warehouse `128c306447d9ef00`); the "Expected result" is the actual output. The
-raw-SQL equivalents (no metric views) are in [`example_queries.sql`](example_queries.sql)
-as a fallback. Genie's *generated* SQL is graded against the result of the answer SQL,
+(warehouse `128c306447d9ef00`); the "Expected result" is the actual output. The space's
+curated examples in [`example_queries.sql`](example_queries.sql) use the same
+metric-view / function forms (synced from the live space). Genie's *generated* SQL is
+graded against the result of the answer SQL,
 so the answer just has to run and return the right rows — it need not match Genie's
 phrasing.
 
