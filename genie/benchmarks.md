@@ -5,29 +5,111 @@ space: they verify Genie generates correct SQL and catch regressions when you ch
 instructions, metric views, or trusted assets. This is the Genie analogue of the
 pytest suite the rest of the repo uses.
 
-## The benchmark set
+Each answer below is the **metric-view / function form** — what a well-curated space
+should resolve to — and every one was **executed live on the workspace 2026-09-10**
+(warehouse `128c306447d9ef00`); the "Expected result" is the actual output. The
+raw-SQL equivalents (no metric views) are in [`example_queries.sql`](example_queries.sql)
+as a fallback. Genie's *generated* SQL is graded against the result of the answer SQL,
+so the answer just has to run and return the right rows — it need not match Genie's
+phrasing.
 
-Each question below pairs with a verified query — the metric-view / function form is
-preferred (it's what a well-curated space should resolve to), with the raw-SQL
-equivalent in [`example_queries.sql`](example_queries.sql) as the fallback.
+## Summary
 
-| # | Question | Expected logic |
-|---|---|---|
-| 1 | What is the latest monthly churn rate? | `MEASURE(\`Churn rate\`)` on `churn_metrics_monthly`, latest `Month` → **~0.0325** |
-| 2 | How has churn trended month over month? | `Churn rate` by `Month` on `churn_metrics_monthly` |
-| 3 | How many users are in each churn risk band? | `Users` by `Risk band` on `churn_metrics_current` |
-| 4 | How much MRR is at risk from high-risk subscribers? | `MRR at risk` by `Risk band` on `churn_metrics_current` → high **~$36.6K** |
-| 5 | Which regions have the highest churn? | `Churn rate` by `Geo`, latest `Month`, `churn_metrics_monthly` |
-| 6 | Who are our most at-risk subscribers? | `at_risk_users(0.9)` |
-| 7 | Which high-risk subscribers have had no CRM outreach in 30 days? | `untouched_at_risk_users('high')` → **~1004** |
-| 8 | Do high-risk users show declining coding hours vs low-risk? | `Avg coding hours trend` by `Risk band` on `churn_metrics_current` |
-| 9 | Are power users less likely to be high risk? | `Avg churn score` by `Is power user` on `churn_metrics_current` |
-| 10 | What is the total MRR of currently-subscribed users? | `MEASURE(\`MRR at risk\`)` (subscribed) on `churn_metrics_current` |
+| # | Question | Answer form | Expected result (validated) |
+|---|---|---|---|
+| 1 | What is the latest monthly churn rate? | `Churn rate` measure, latest month | **0.0325** |
+| 2 | How has churn trended month over month? | `Churn rate` by `Month` | 18 months, 0.0556 → 0.0325 (declining) |
+| 3 | How many users are in each churn risk band? | `Users` by `Risk band` | low 23,353 · high 20,581 · medium 6,066 |
+| 4 | How much MRR is at risk from high-risk subscribers? | `MRR at risk` by `Risk band` | high **$36,568** (low 446,184 · med 58,736) |
+| 5 | Which regions have the highest churn? | `Churn rate` by `Geo`, latest month | LATAM 0.0399 (highest) → ANZ 0.0306 |
+| 6 | Who are our most at-risk subscribers? | `at_risk_users(0.9)` | 357 users, score ≥ 0.9 |
+| 7 | Which high-risk subscribers have had no CRM outreach in 30 days? | `untouched_at_risk_users('high')` | **1,004** users |
+| 8 | Do high-risk users show declining coding hours vs low-risk? | `Avg coding hours trend` by `Risk band` | high 0.91 · med 0.98 · low 1.02 |
+| 9 | Are power users less likely to be high risk? | `Avg churn score` by `Is power user` | power 0.058 vs non-power 0.573 |
+| 10 | What is the total MRR of currently-subscribed users? | `MRR at risk` measure (ungrouped) | **$541,488** |
+
+> Consistency checks: Q4 bands sum to Q10 ($446,184 + 58,736 + 36,568 = $541,488);
+> Q3 bands sum to the full 50,000-user base. `MRR at risk` is MRR of
+> *currently-subscribed* users (the measure filters on `is_currently_subscribed`),
+> so Q4/Q10 are subscribed-only while Q3 `Users` counts the whole base.
+
+## Answer SQL (validated 2026-09-10)
+
+**1 — Latest monthly churn rate** → `0.0325`
+```sql
+SELECT MEASURE(`Churn rate`) AS churn_rate
+FROM dev_churn.gold.churn_metrics_monthly
+WHERE `Month` = (SELECT MAX(month_start) FROM dev_churn.silver.churn_labels);
+```
+
+**2 — Churn trend month over month** → 18 rows, 0.0556 (2025-03) → 0.0325 (2026-08)
+```sql
+SELECT `Month`, MEASURE(`Churn rate`) AS churn_rate
+FROM dev_churn.gold.churn_metrics_monthly
+GROUP BY `Month`
+ORDER BY `Month`;
+```
+
+**3 — Users per risk band** → low 23,353 · high 20,581 · medium 6,066
+```sql
+SELECT `Risk band`, MEASURE(`Users`) AS users
+FROM dev_churn.gold.churn_metrics_current
+GROUP BY `Risk band`
+ORDER BY users DESC;
+```
+
+**4 — MRR at risk by band** → high $36,568 · medium $58,736 · low $446,184
+```sql
+SELECT `Risk band`, MEASURE(`MRR at risk`) AS mrr_at_risk
+FROM dev_churn.gold.churn_metrics_current
+GROUP BY `Risk band`
+ORDER BY mrr_at_risk DESC;
+```
+
+**5 — Regions with highest churn (latest month)** → LATAM 0.0399 (highest) … ANZ 0.0306
+```sql
+SELECT `Geo`, MEASURE(`Churn rate`) AS churn_rate
+FROM dev_churn.gold.churn_metrics_monthly
+WHERE `Month` = (SELECT MAX(month_start) FROM dev_churn.silver.churn_labels)
+GROUP BY `Geo`
+ORDER BY churn_rate DESC;
+```
+
+**6 — Most at-risk subscribers** → 357 users with `churn_score` ≥ 0.9
+```sql
+SELECT * FROM dev_churn.gold.at_risk_users(0.9);
+```
+
+**7 — High-risk subscribers with no CRM outreach in 30 days** → 1,004 users
+```sql
+SELECT * FROM dev_churn.gold.untouched_at_risk_users('high');
+```
+
+**8 — Declining coding hours by risk band** → high 0.91 · medium 0.98 · low 1.02
+```sql
+SELECT `Risk band`, MEASURE(`Avg coding hours trend`) AS avg_coding_trend
+FROM dev_churn.gold.churn_metrics_current
+GROUP BY `Risk band`
+ORDER BY avg_coding_trend;
+```
+
+**9 — Power users vs churn risk** → power users 0.058 vs non-power 0.573
+```sql
+SELECT `Is power user`, MEASURE(`Avg churn score`) AS avg_churn_score
+FROM dev_churn.gold.churn_metrics_current
+GROUP BY `Is power user`;
+```
+
+**10 — Total MRR of currently-subscribed users** → $541,488
+```sql
+SELECT MEASURE(`MRR at risk`) AS total_mrr
+FROM dev_churn.gold.churn_metrics_current;
+```
 
 ## Add + run
 
-1. In the space, open **Benchmarks** and add each row (question + its expected SQL).
-   Editors can also **save a good chat answer as a benchmark** directly from a
+1. In the space, open **Benchmarks** and add each row (question + its answer SQL
+   above). Editors can also **save a good chat answer as a benchmark** directly from a
    conversation.
 2. Run an evaluation from the CLI (the space id is in the space URL):
 
