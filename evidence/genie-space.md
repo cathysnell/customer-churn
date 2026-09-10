@@ -115,22 +115,63 @@ confirmed via `genie get-space <id> --include-serialized-space`:
 4. ✅ Join spec de-duplicated (kept the named "Predictions to serving" one); entity
    matching enabled on `Geo` (+ format assistance across columns).
 
-## Remaining / pending the re-run
+## Benchmark tuning rounds + the 9/10 ceiling (2026-09-10)
 
-- **Re-run the benchmark eval** (owner: Cathy, in the UI) to measure the lift from the
-  fixes above, then record the new per-question verdicts + score here.
-- **Q6 wording** — the new `at_risk_users(0.9)` example should fix the wrong-question
-  miss, but "most at-risk" is still looser than "score ≥ 0.9"; if it's still flagged,
-  reword the benchmark question (a `benchmarks.md` edit, not a space change).
-- **Grading intent** — decide whether "correct numbers" is enough (manually accept the
-  raw-SQL NEEDS_REVIEW answers) or whether "uses the certified ontology" is the bar
-  (the wiring above is the real fix, so expect most to flip to GOOD).
-- **Minor** — nudge Genie via instructions to return only the requested measure +
-  grouping (Q2/Q8/Q9 lost points partly for extra columns).
+After the ontology wiring, several more rounds ran. Score progression across runs:
+**4 → 6 → 8 → 8 → 7 → 9 → 9**. Pulling each run's per-question detail
+(`genie-get-eval-result-details`) showed every remaining miss was a **benchmark
+expected-answer bug**, not a Genie/ontology defect — and that **Genie-code's
+auto-fixer had been mutating the expected answers to chase whatever Genie generated
+on a given run**, leaving them contradictory with the questions/instructions. Fixes
+applied to the live space via `genie update-space` (full serialized_space replacement
+with etag), pulling the current space first so the 4 prior rounds were preserved:
 
-To re-sync the built space into the repo after further edits:
-`databricks genie get-space <id> --include-serialized-space` (the `serialized_space`
-holds instructions, data sources, example SQLs, functions, join specs, and benchmarks).
+- **Q8** expected filtered `WHERE Risk band IN ('high','low')` (2 bands) while the
+  question asks to compare "across churn risk bands" → changed expected to all bands;
+  also reworded the question band-agnostic. Now passes.
+- **Q6 / Q7** expected answers carried `ROUND(churn_score,3)` / `ROUND(coding_hours_trend,2)`,
+  which fought a "return raw numeric values, no ROUND()" instruction and Genie's raw
+  output → stripped ROUND from the expected answers.
+- **Q7** expected had an arbitrary `LIMIT 50` while "which subscribers" means all →
+  removed the LIMIT; added a "list questions return all rows, no LIMIT unless a top-N
+  is asked" instruction.
+
+**The ceiling is LLM non-determinism, not a bug.** Every run now scores **9/10**, but
+*which* row-level question fails rotates between **Q6 and Q7**: Genie
+non-deterministically wraps `churn_score` / `coding_hours_trend` in `ROUND()` (and
+occasionally adds a `LIMIT`) on those two list questions — on runs where it rounds,
+exact-match grading fails the formatting; on runs where it doesn't, it passes. The
+expected answers are now correct and internally consistent; the remaining gap is that
+Genie doesn't deterministically obey the no-ROUND instruction. Genie's *answer is
+analytically correct every run* — the only difference is display rounding
+(e.g. `0.998` vs `0.9987`).
+
+## Recommendation (at 9/10 — grading-philosophy call, not more tuning)
+
+Chasing 10/10 by re-tuning is whack-a-mole against a stochastic generator (it's what
+put the expected answers in a contradictory state to begin with). Options, best first:
+
+1. **Accept the correct-but-rounded answers via manual review.** The eval result
+   carries a `manual_assessment` field; mark the rounded Q6/Q7 answers as acceptable.
+   This records a true 10/10 without pretending Genie is deterministic.
+2. **Treat 9/10 as effectively passing** with this cosmetic-rounding flake documented
+   — the substance (ontology usage, correct results) is there on all 10.
+3. **Numeric-format-tolerant judge**, if/when the platform exposes that — the right
+   long-term fix, since exact-value matching is too brittle for a stochastic SQL
+   generator on cosmetic formatting.
+
+Not recommended: putting `ROUND()` back into the expected answers — Genie rounds only
+*some* runs, so no single expected answer (raw or rounded) matches both variants.
+
+## Repo sync status
+
+The repo's `genie/benchmarks.md` + `example_queries.sql` + `instructions.md` still
+reflect the pre-Genie-code metric-view answer forms plus two targeted edits
+(no-ROUND rule, Q8 reword). They have **not** been fully re-synced to the live space's
+current (Genie-code-mutated + hand-corrected) benchmark answers, since that state is
+still in flux pending the grading-philosophy decision above. Full re-sync
+(`genie get-space <id> --include-serialized-space` → repo) should happen once the
+benchmark set is finalized/accepted.
 
 ## Access / grants (per-stage model)
 
