@@ -1,0 +1,10 @@
+{
+  "_comment": "Stage 3 — UC synced table (reverse ETL) spec for Lakebase Autoscaling. Used with: databricks postgres create-synced-table dev_churn_serving_pg.public.churn_serving --json @serving/synced_table.json. SNAPSHOT = one-time/on-demand full copy (no Change Data Feed needed). Switch to TRIGGERED for scheduled refresh once CDF is enabled on the source (ALTER TABLE dev_churn.gold.churn_serving SET TBLPROPERTIES (delta.enableChangeDataFeed = true)).",
+  "spec": {
+    "branch": "projects/dev-churn-serving/branches/production",
+    "postgres_database": "databricks_postgres",
+    "source_table_full_name": "dev_churn.gold.churn_serving",
+    "primary_key_columns": ["user_id"],
+    "scheduling_policy": "SNAPSHOT"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "_comment": "Stage 3 serving — serverless reverse-ETL job (notebook task). Deploy: import serving/reverse_etl.py to the workspace as a NOTEBOOK, then databricks jobs create --json @serving/reverse_etl_job.json (adjust notebook_path). Serverless (no cluster block); psycopg installed via %pip in the notebook. Refreshes Lakebase daily.",
+  "name": "dev-churn-reverse-etl-serving",
+  "tasks": [
+    {
+      "task_key": "reverse_etl",
+      "notebook_task": {
+        "notebook_path": "/Workspace/Users/cathy.snell@databricks.com/usage_events_ingest/serving/reverse_etl"
+      }
+    }
+  ],
+  "schedule": {
+    "quartz_cron_expression": "0 0 6 * * ?",
+    "timezone_id": "UTC",
+    "pause_status": "PAUSED"
+  },
+  "queue": {"enabled": true}
+}
