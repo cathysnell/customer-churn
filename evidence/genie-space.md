@@ -61,11 +61,12 @@ referenced in a `QUALIFY` window filter, so the top-N function was recast as a
 score-threshold function `at_risk_users(min_score)`; UC functions must be created one
 statement per SQL-API call.
 
-## Benchmark eval run (2026-09-10)
+## Benchmark eval run — baseline, before ontology wiring (2026-09-10)
 
 Space **"Subscription Churn Analytics"** — `space_id 01f1ad360e121f099e3070de938cd8cb`,
 warehouse `128c306447d9ef00`. Ran the 10 benchmarks ([`../genie/benchmarks.md`](../genie/benchmarks.md))
-in the workspace. Latest run `01f1ad605bf31c8d97f5240eaa0e3c31`:
+in the workspace. Run `01f1ad605bf31c8d97f5240eaa0e3c31` — this is the **baseline
+taken before the fixes below were applied**:
 
 **Score: 4 GOOD / 5 NEEDS_REVIEW / 1 BAD (4/10 correct).**
 
@@ -96,29 +97,40 @@ to them; (b) the space's example queries ([`../genie/example_queries.sql`](../ge
 are the **raw-SQL** forms, which actively teach Genie to imitate raw-table SQL — in
 direct conflict with the metric-view expected answers.
 
-## Proposed follow-ups (NOT yet applied — pending review)
+## Fixes applied (2026-09-10, after the baseline run)
 
-1. **Wire the ontology into the space** (highest leverage): add `churn_metrics_current`
-   and `churn_metrics_monthly` as data sources / metrics, and register `at_risk_users`
-   + `untouched_at_risk_users` as trusted assets. The objects exist in UC but Genie
-   isn't routing to them.
-2. **Replace the space's example queries with the metric-view forms** (from
-   `benchmarks.md`) so examples and expected answers agree — the raw-SQL examples are
-   teaching the wrong pattern.
-3. **Fix Q6**: reword to an unambiguous ranked-list ask ("List the subscribers most
-   likely to churn, highest score first") and register `at_risk_users` so Genie routes
-   to it; reconsider the `0.9` threshold in the expected answer vs. a top-N ordering.
-4. **Decide grading intent**: if "correct numbers" is enough, the NEEDS_REVIEW raw-SQL
-   answers (Q1/Q2/Q5) are arguably fine and could be manually accepted; if "use the
-   certified semantic layer" is the bar, keep them failing until fix #1/#2 land. The
-   score is a proxy for *"is Genie using the governed ontology,"* which is the point of
-   Stage 5 — so #1/#2 are the real fix, not relaxing the benchmark.
-5. Minor: instruct Genie to return only the requested measure + grouping (Q2/Q8/Q9
-   lost points partly for extra columns).
+Applied in the live space by the Genie space editor and mirrored back to the repo;
+confirmed via `genie get-space <id> --include-serialized-space`:
 
-Re-run the eval after #1/#2 to confirm the lift, then version the space back
-(`databricks genie get-space <id>` — note this workspace's `get-space` returns only
-summary fields, not a `serialized_space` blob).
+1. ✅ **Ontology wired into the space.** Both metric views (`churn_metrics_current`,
+   `churn_metrics_monthly`) are now registered **data sources**, and both functions
+   (`at_risk_users`, `untouched_at_risk_users`) are registered **trusted assets** —
+   so Genie can route to them (baseline root cause was that it couldn't).
+2. ✅ **Example queries moved to metric-view / function forms.** 5 curated examples
+   (Q1, Q2, Q5, declining-engagement, power-users) now use `MEASURE()`; the raw-SQL
+   examples that were teaching the wrong pattern are gone. Synced verbatim to
+   [`../genie/example_queries.sql`](../genie/example_queries.sql) (11 queries).
+3. ✅ **New example for Q6** — "Who are our most at-risk subscribers?" →
+   `SELECT * FROM dev_churn.gold.at_risk_users(0.9)`.
+4. ✅ Join spec de-duplicated (kept the named "Predictions to serving" one); entity
+   matching enabled on `Geo` (+ format assistance across columns).
+
+## Remaining / pending the re-run
+
+- **Re-run the benchmark eval** (owner: Cathy, in the UI) to measure the lift from the
+  fixes above, then record the new per-question verdicts + score here.
+- **Q6 wording** — the new `at_risk_users(0.9)` example should fix the wrong-question
+  miss, but "most at-risk" is still looser than "score ≥ 0.9"; if it's still flagged,
+  reword the benchmark question (a `benchmarks.md` edit, not a space change).
+- **Grading intent** — decide whether "correct numbers" is enough (manually accept the
+  raw-SQL NEEDS_REVIEW answers) or whether "uses the certified ontology" is the bar
+  (the wiring above is the real fix, so expect most to flip to GOOD).
+- **Minor** — nudge Genie via instructions to return only the requested measure +
+  grouping (Q2/Q8/Q9 lost points partly for extra columns).
+
+To re-sync the built space into the repo after further edits:
+`databricks genie get-space <id> --include-serialized-space` (the `serialized_space`
+holds instructions, data sources, example SQLs, functions, join specs, and benchmarks).
 
 ## Access / grants (per-stage model)
 
