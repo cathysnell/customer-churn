@@ -29,6 +29,23 @@ frequency, support load, CRM contact.
 - **The decline signal**: falling `coding_hours_trend_30d` (<1 = declining), acceptance
   rate, and session frequency all track higher churn.
 
+## Vocabulary — map these words to column values
+
+Users say business terms the data doesn't store literally. Resolve them:
+
+- **Regions** (`geo`): "Europe" → `EMEA`; "North America" / "US" / "USA" → `NA`;
+  "Asia" / "Asia-Pacific" → `APAC`; "Latin America" → `LATAM`; "Middle East" /
+  "Africa" → `MEA`; "Australia" / "New Zealand" / "Oceania" → `ANZ`.
+- **Risk** (`churn_risk_band`): "at risk" / "at-risk" / "flight risk" / "likely to
+  churn" → `high`.
+- **Lapsed** (`subscription_status`): "lapsed" / "cancelled" / "churned" → `canceled`.
+- **Personas** (`persona`): "founder" → `startup_founder`; "solo dev" / "individual"
+  → `individual_dev`; "lead" / "manager" → `team_lead`.
+- **Plans** (`plan`): "team plan" → `pro_team_monthly`; "annual plan" → `pro_annual`.
+
+(Values the data *does* contain — the region codes, band names, personas themselves —
+are handled by per-column entity matching; see [`knowledge_store.md`](knowledge_store.md).)
+
 ## The one rule to always follow
 
 `churn_score` is a **risk ranking, not a calibrated probability** — the model

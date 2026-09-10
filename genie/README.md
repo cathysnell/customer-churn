@@ -40,18 +40,22 @@ the workspace:
 Add the two metric views (and optionally the functions) to the space as **data
 sources / trusted assets** — they're the primary things Genie should reason over.
 
-Two more knowledge-store levers worth adding in the UI (they don't version cleanly to
-the repo but are captured by `get-space`): **value dictionaries / synonyms** (map
-"EMEA"/"Pro"/"at risk" to the actual geo codes / tier / high band) and **column
-show/hide** (hide audit columns like `model_name`, `scored_at`).
+The **knowledge store** (per-column synonyms + entity matching) is UI-only — it isn't
+in `serialized_space`, so it's captured only by `get-space`. [`knowledge_store.md`](knowledge_store.md)
+is the reviewable source of record: the synonyms to type per column, which columns to
+turn **entity matching** on for (with their actual values), and the value aliases that
+go in `instructions.md` instead. Note: there is no free-text "value dictionary" box —
+entity matching is a per-column toggle that works off the column's real values; words
+the data doesn't contain ("Europe" → `EMEA`) are handled by the instructions aliases.
 
 ## Contents (the analyst-authored parts)
 
 | File | Where it goes in the space |
 | --- | --- |
-| [`instructions.md`](instructions.md) | **Instructions** — business definitions, the `churn_score`-is-a-ranking caveat, and the join rules |
+| [`instructions.md`](instructions.md) | **Instructions** — business definitions, the value-word aliases, the `churn_score`-is-a-ranking caveat, and the join rules |
 | [`example_queries.sql`](example_queries.sql) | **SQL queries** — 10 curated/"trusted" queries that teach Genie the joins; validated live 2026-09-10 |
 | [`sample_questions.md`](sample_questions.md) | **Sample questions** — starter chips + a demo flow, with verified answers |
+| [`knowledge_store.md`](knowledge_store.md) | **Column synonyms + entity matching** (per-column, UI-only) — the reviewable record of what to enter in each column dialog |
 
 ## Create the space (requires approval — workspace write)
 
