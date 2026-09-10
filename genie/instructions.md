@@ -1,64 +1,38 @@
 # Genie space — instructions / context
 
-Paste this into the Genie space's **Instructions** (General instructions). It gives
-Genie the business definitions and join rules it can't infer from schema alone.
+Paste this into the space's **Instructions**. It is deliberately short: most of the
+semantics now live in structural layers Genie reads directly (the curation hierarchy
+puts text instructions **last**). Prefer, in order:
 
----
+1. **Metric views** — `dev_churn.gold.churn_metrics_current` (one row/user: risk bands,
+   MRR at risk, engagement) and `dev_churn.gold.churn_metrics_monthly` (churn rate and
+   trends over time). Certified measures/dimensions; use these for aggregates.
+2. **Trusted functions** — `dev_churn.gold.at_risk_users(min_score)` and
+   `dev_churn.gold.untouched_at_risk_users(band)` for the common row-level asks.
+3. **Foreign keys** — `churn_predictions.user_id → churn_serving.user_id` is declared
+   in UC, so joins across the two are known; both are 1 row per user.
 
 ## What this data is
 
-A **freemium-to-Pro AI code editor** (Cursor archetype). We predict which Pro
-subscribers will **churn** (cancel) so the retention team can intervene. Engagement
-is measured monthly per user: coding hours, AI-suggestion acceptance rate, session
-frequency, support load, and CRM contact.
+A freemium-to-Pro **AI code editor** (Cursor archetype). We predict which Pro
+subscribers will **churn** (cancel) so the retention team can intervene. Engagement is
+measured monthly per user: coding hours, AI-suggestion acceptance rate, session
+frequency, support load, CRM contact.
 
-## Key definitions
+## Definitions that aren't in the metrics layer
 
-- **Churn** = an active subscriber on the first day of a month who **cancels during
-  that month**. `churned = TRUE` marks that. Monthly churn rate is simply
-  `AVG(churned)` over the at-risk rows for a month — the table only contains rows for
-  months a user was actually at risk, so no denominator adjustment is needed.
-- **Currently subscribed** = `is_currently_subscribed = TRUE` (subscription status is
-  `active` or `downgraded`). Use this to restrict "who should we save" questions to
-  live revenue.
-- **Churn score** (`churn_score`, 0–1) = the model's churn **propensity**. It is a
-  strong **ranking** of risk, **not a calibrated probability** — its absolute values
-  run higher than the true ~3–5% monthly churn rate because the model up-weights the
-  rare churn class. **Rank and compare with it; do not report it as "X% will churn."**
-- **Risk band** (`churn_risk_band`) = `high` / `medium` / `low`, the actionable
-  bucket derived from the score. Prefer this (and MRR at risk) over the raw score for
-  business answers.
-- **MRR at risk** = `SUM(mrr_usd)` over currently-subscribed users in a given risk
-  band — the revenue the retention play is protecting.
-- **The headline decline signal** is `coding_hours_trend_30d`: a ratio of this
-  month's coding hours to last month's (1.0 = flat, < 1 = declining). Falling coding
-  hours, falling `avg_acceptance_rate`, and falling `avg_session_frequency` all
-  correlate with higher churn.
+- **Churn** = an active subscriber on the first of a month who cancels during it
+  (`churned = TRUE`). Monthly churn rate = `AVG(churned)` — use the *Churn rate*
+  measure on `churn_metrics_monthly`.
+- **Currently subscribed** = `is_currently_subscribed = TRUE` (status `active` or
+  `downgraded`). Restrict "who should we save" questions to these.
+- **The decline signal**: falling `coding_hours_trend_30d` (<1 = declining), acceptance
+  rate, and session frequency all track higher churn.
 
-## Tables and how to join them
+## The one rule to always follow
 
-- **`dev_churn.gold.churn_serving`** — one row per user, current state: identity
-  (`geo`, `plan`, `tier`, `persona`, `power_user_flag`), subscription
-  (`subscription_status`, `is_currently_subscribed`, `mrr_usd`, `billing_period`),
-  and the latest observed monthly engagement/label. **Default table for "who / how
-  many / how much" questions about the current base.**
-- **`dev_churn.gold.churn_predictions`** — one row per user: `churn_score`,
-  `churn_risk_band`, `as_of_month`, and the `model_version` that produced it. **Join
-  to `churn_serving` on `user_id`** to attach profile/revenue to a risk score.
-- **`dev_churn.silver.churn_labels`** — one row per user **per month** (`month_start`
-  grain). Use this, not the gold tables, for **history / trend-over-time** questions
-  (churn rate by month, engagement trends).
-
-Join key throughout is `user_id`. `churn_serving` and `churn_predictions` are 1:1 per
-user; `churn_labels` is many-per-user (monthly).
-
-## Answering guidance
-
-- "At-risk / who should we contact" → `churn_predictions` filtered to `high` (optionally
-  `medium`) risk, joined to `churn_serving` for profile, and usually restricted to
-  `is_currently_subscribed = TRUE`.
-- "Churn rate" or "trend" → `silver.churn_labels`, `AVG(CAST(churned AS INT))`, grouped
-  by `month_start` (or `geo`, `persona`, …).
-- Never present `churn_score` as a literal probability of churning; describe it as a
-  risk score / ranking. When quantifying business impact, use counts by risk band and
-  MRR at risk.
+`churn_score` is a **risk ranking, not a calibrated probability** — the model
+up-weights the rare churn class, so scores run well above the true ~3–5% monthly rate.
+**Never report it as "X% of users will churn."** Quantify risk with **risk-band counts**
+and **MRR at risk** (the *MRR at risk* measure sliced by *Risk band*), and rank
+individuals by score. There is intentionally no "churn probability" measure to report.

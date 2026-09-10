@@ -116,4 +116,12 @@ for col, comment in _COMMENTS.items():
 spark.sql(f"ALTER TABLE {TARGET_TABLE} ALTER COLUMN user_id SET NOT NULL")  # noqa: F821
 spark.sql(f"ALTER TABLE {TARGET_TABLE} ADD CONSTRAINT churn_predictions_pk PRIMARY KEY (user_id)")  # noqa: F821
 
+# Declare the FK to the serving table so Unity Catalog carries the relationship (Genie
+# reads UC FKs to join deterministically). RELY isn't enforced; it's informational
+# lineage. Re-applied here because the overwrite above drops table constraints.
+spark.sql(  # noqa: F821
+    f"ALTER TABLE {TARGET_TABLE} ADD CONSTRAINT churn_predictions_user_fk "
+    "FOREIGN KEY (user_id) REFERENCES dev_churn.gold.churn_serving(user_id)"
+)
+
 print(f"wrote {out.shape[0]:,} rows to {TARGET_TABLE} (model v{model_version})")

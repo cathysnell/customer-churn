@@ -40,6 +40,27 @@ Every curated query returned without error, confirming the joins and the busines
 definitions in [`../genie/instructions.md`](../genie/instructions.md) resolve against
 the deployed schema.
 
+## Semantic layer / ontology — deployed & verified (2026-09-10)
+
+Following Databricks' curation hierarchy (prose instructions last), the semantics were
+pushed into structural governed layers. All created and verified live on
+`fevm-serverless-stable-yuzk83`:
+
+| Object | Type | Verified |
+| --- | --- | --- |
+| `dev_churn.gold.churn_metrics_current` | metric view (serving ⋈ predictions) | `MEASURE(MRR at risk)` by band = high $36,568 / med $58,736 / low $446,184 (matches raw SQL) |
+| `dev_churn.gold.churn_metrics_monthly` | metric view (churn_labels) | `MEASURE(Churn rate)` latest month = 0.0325 |
+| `dev_churn.gold.at_risk_users(min_score)` | trusted function | `at_risk_users(0.95)` returns subscribed users ≥ 0.95, score desc |
+| `dev_churn.gold.untouched_at_risk_users(band)` | trusted function | `untouched_at_risk_users('high')` = 1004 |
+| `churn_predictions_user_fk` | FK → `churn_serving(user_id)` | present in `information_schema.table_constraints`; baked into `ml/score_churn.py` so it survives re-scoring |
+
+`instructions.md` was correspondingly slimmed to the qualitative caveat
+(`churn_score` is a ranking, not a probability) plus a pointer to these objects.
+Two bring-up notes: a SQL function's `LIMIT` must be constant and a param can't be
+referenced in a `QUALIFY` window filter, so the top-N function was recast as a
+score-threshold function `at_risk_users(min_score)`; UC functions must be created one
+statement per SQL-API call.
+
 ## Pending (workspace write, on approval)
 
 Create the space in the UI on warehouse `128c306447d9ef00`, load the instructions +

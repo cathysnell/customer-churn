@@ -23,6 +23,28 @@ Keep the scope tight — Genie answers better with a few well-described tables t
 the whole catalog. The silver source tables (users, subscriptions, usage_events, …)
 stay out of scope; their signal is already rolled up into the three above.
 
+## Ontology / semantic layer (what drives accuracy)
+
+Following Databricks' curation hierarchy (*datasets → SQL expressions → example SQL →
+text instructions*, prose last), most semantics live in structural, governed layers —
+so `instructions.md` is now short. All of the below are **deployed and verified** on
+the workspace:
+
+| Layer | Object(s) | Why |
+| --- | --- | --- |
+| **Metric views** | `dev_churn.gold.churn_metrics_current`, `dev_churn.gold.churn_metrics_monthly` ([`../metrics/`](../metrics/)) | Certified measures (churn rate, MRR at risk, band counts) + dimensions; Genie resolves aggregates from one source of truth, not inference |
+| **Trusted functions** | `at_risk_users(min_score)`, `untouched_at_risk_users(band)` ([`functions.sql`](functions.sql)) | Parameterized verified logic Genie *calls* for the common row-level asks |
+| **Join relationship (FK)** | `churn_predictions.user_id → churn_serving.user_id` | UC-declared, so Genie joins the two deterministically (baked into `ml/score_churn.py`) |
+| **Benchmarks** | [`benchmarks.md`](benchmarks.md) | Accuracy unit-tests; catch regressions after instruction/metric changes |
+
+Add the two metric views (and optionally the functions) to the space as **data
+sources / trusted assets** — they're the primary things Genie should reason over.
+
+Two more knowledge-store levers worth adding in the UI (they don't version cleanly to
+the repo but are captured by `get-space`): **value dictionaries / synonyms** (map
+"EMEA"/"Pro"/"at risk" to the actual geo codes / tier / high band) and **column
+show/hide** (hide audit columns like `model_name`, `scored_at`).
+
 ## Contents (the analyst-authored parts)
 
 | File | Where it goes in the space |
