@@ -61,12 +61,64 @@ referenced in a `QUALIFY` window filter, so the top-N function was recast as a
 score-threshold function `at_risk_users(min_score)`; UC functions must be created one
 statement per SQL-API call.
 
-## Pending (workspace write, on approval)
+## Benchmark eval run (2026-09-10)
 
-Create the space in the UI on warehouse `128c306447d9ef00`, load the instructions +
-the 10 trusted queries + the sample-question chips, then (optionally) run a Genie
-benchmark over the sample questions. Once created, version it back with
-`databricks genie get-space <id>` and record the space id + benchmark score here.
+Space **"Subscription Churn Analytics"** — `space_id 01f1ad360e121f099e3070de938cd8cb`,
+warehouse `128c306447d9ef00`. Ran the 10 benchmarks ([`../genie/benchmarks.md`](../genie/benchmarks.md))
+in the workspace. Latest run `01f1ad605bf31c8d97f5240eaa0e3c31`:
+
+**Score: 4 GOOD / 5 NEEDS_REVIEW / 1 BAD (4/10 correct).**
+
+| # | Question | Verdict | Judge reason | Genie's generated SQL |
+| --- | --- | --- | --- | --- |
+| 1 | latest churn rate | NEEDS_REVIEW | INCORRECT_METRIC_CALCULATION | raw `AVG(CAST(churned AS INT))` on `silver.churn_labels` |
+| 2 | churn trend MoM | NEEDS_REVIEW | INCORRECT_METRIC_CALCULATION | raw `churn_labels`, extra cols (at_risk/churned counts) |
+| 3 | users per band | GOOD | — | raw `churn_predictions` COUNT by band |
+| 4 | MRR at risk | GOOD | — | raw join `SUM(mrr_usd) WHERE is_currently_subscribed` |
+| 5 | regions highest churn | NEEDS_REVIEW | INCORRECT_TABLE_OR_FIELD_USAGE | raw `churn_labels` (latest-month filter) |
+| 6 | most at-risk subscribers | BAD | RESULT_MISSING_COLUMNS, MISSING_OR_INCORRECT_FILTER | answered the *wrong question* — a COUNT/SUM of untouched high-risk, not a ranked list |
+| 7 | no CRM outreach 30d | GOOD | — | called `untouched_at_risk_users('high')` ✓ |
+| 8 | declining coding by band | NEEDS_REVIEW | INCORRECT_TABLE_OR_FIELD_USAGE | raw join, extra cols |
+| 9 | power users vs risk | NEEDS_REVIEW | INCORRECT_TABLE_OR_FIELD_USAGE | raw join, extra cols |
+| 10 | total MRR subscribed | GOOD | — | raw `SUM(mrr_usd) WHERE is_currently_subscribed` |
+
+**Root cause:** Genie is **not using the metric views or functions** — it hand-rolls
+raw SQL against the base/gold tables. Where the raw result happens to match the
+expected shape/values it passes (Q3/Q4/Q10), but the LLM judge flags the method as
+incorrect metric calculation / table usage everywhere the expected answer used
+`MEASURE()` (Q1/Q2/Q5/Q8/Q9). Q7 is the one metric-layer win — Genie called the
+trusted function. Q6 is a genuine miss: Genie misread "most at-risk subscribers" and
+answered the CRM-outreach question instead.
+
+Two contributing factors: (a) the metric views/functions may not be wired into the
+space as data sources / trusted assets — if they aren't registered, Genie can't route
+to them; (b) the space's example queries ([`../genie/example_queries.sql`](../genie/example_queries.sql))
+are the **raw-SQL** forms, which actively teach Genie to imitate raw-table SQL — in
+direct conflict with the metric-view expected answers.
+
+## Proposed follow-ups (NOT yet applied — pending review)
+
+1. **Wire the ontology into the space** (highest leverage): add `churn_metrics_current`
+   and `churn_metrics_monthly` as data sources / metrics, and register `at_risk_users`
+   + `untouched_at_risk_users` as trusted assets. The objects exist in UC but Genie
+   isn't routing to them.
+2. **Replace the space's example queries with the metric-view forms** (from
+   `benchmarks.md`) so examples and expected answers agree — the raw-SQL examples are
+   teaching the wrong pattern.
+3. **Fix Q6**: reword to an unambiguous ranked-list ask ("List the subscribers most
+   likely to churn, highest score first") and register `at_risk_users` so Genie routes
+   to it; reconsider the `0.9` threshold in the expected answer vs. a top-N ordering.
+4. **Decide grading intent**: if "correct numbers" is enough, the NEEDS_REVIEW raw-SQL
+   answers (Q1/Q2/Q5) are arguably fine and could be manually accepted; if "use the
+   certified semantic layer" is the bar, keep them failing until fix #1/#2 land. The
+   score is a proxy for *"is Genie using the governed ontology,"* which is the point of
+   Stage 5 — so #1/#2 are the real fix, not relaxing the benchmark.
+5. Minor: instruct Genie to return only the requested measure + grouping (Q2/Q8/Q9
+   lost points partly for extra columns).
+
+Re-run the eval after #1/#2 to confirm the lift, then version the space back
+(`databricks genie get-space <id>` — note this workspace's `get-space` returns only
+summary fields, not a `serialized_space` blob).
 
 ## Access / grants (per-stage model)
 
