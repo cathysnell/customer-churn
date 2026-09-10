@@ -1,0 +1,37 @@
+{
+  "_comment": "Stage 4 (Intelligence) — serverless churn ML job: train -> score -> sync predictions to Lakebase. Deploy: import ml/train_churn_model.py and ml/score_churn.py to the workspace as NOTEBOOKs (databricks workspace import ... --format AUTO), then databricks jobs create --json @ml/churn_ml_job.json (adjust notebook_path prefixes to match your workspace). Serverless (no cluster blocks); deps installed via %pip in each notebook. The sync_predictions task reuses serving/reverse_etl.py with job parameters pointing at churn_predictions. Runs daily, paused by default.",
+  "name": "dev-churn-ml-scoring",
+  "tasks": [
+    {
+      "task_key": "train",
+      "notebook_task": {
+        "notebook_path": "/Workspace/Users/cathy.snell@databricks.com/usage_events_ingest/ml/train_churn_model"
+      }
+    },
+    {
+      "task_key": "score",
+      "depends_on": [{"task_key": "train"}],
+      "notebook_task": {
+        "notebook_path": "/Workspace/Users/cathy.snell@databricks.com/usage_events_ingest/ml/score_churn"
+      }
+    },
+    {
+      "task_key": "sync_predictions",
+      "depends_on": [{"task_key": "score"}],
+      "notebook_task": {
+        "notebook_path": "/Workspace/Users/cathy.snell@databricks.com/usage_events_ingest/serving/reverse_etl",
+        "base_parameters": {
+          "source_table": "dev_churn.gold.churn_predictions",
+          "target_table": "public.churn_predictions",
+          "pk": "user_id"
+        }
+      }
+    }
+  ],
+  "schedule": {
+    "quartz_cron_expression": "0 0 7 * * ?",
+    "timezone_id": "UTC",
+    "pause_status": "PAUSED"
+  },
+  "queue": {"enabled": true}
+}
