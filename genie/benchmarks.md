@@ -25,7 +25,7 @@ phrasing.
 | 5 | Which regions have the highest churn? | `Churn rate` by `Geo`, latest month | LATAM 0.0399 (highest) → ANZ 0.0306 |
 | 6 | Who are our most at-risk subscribers? | `at_risk_users(0.9)` | 357 users, score ≥ 0.9 |
 | 7 | Which high-risk subscribers have had no CRM outreach in 30 days? | `untouched_at_risk_users('high')` | **1,004** users |
-| 8 | Do high-risk users show declining coding hours vs low-risk? | `Avg coding hours trend` by `Risk band` | high 0.91 · med 0.98 · low 1.02 |
+| 8 | How does the average coding-hours trend compare across churn risk bands? | `Avg coding hours trend` by `Risk band` | high 0.91 · med 0.98 · low 1.02 |
 | 9 | Are power users less likely to be high risk? | `Avg churn score` by `Is power user` | power 0.058 vs non-power 0.573 |
 | 10 | What is the total MRR of currently-subscribed users? | `MRR at risk` measure (ungrouped) | **$541,488** |
 
@@ -88,7 +88,8 @@ SELECT * FROM dev_churn.gold.at_risk_users(0.9);
 SELECT * FROM dev_churn.gold.untouched_at_risk_users('high');
 ```
 
-**8 — Declining coding hours by risk band** → high 0.91 · medium 0.98 · low 1.02
+**8 — Average coding-hours trend across risk bands** → high 0.91 · medium 0.98 · low 1.02
+(band-agnostic wording so Genie returns all three bands rather than filtering to high/low)
 ```sql
 SELECT `Risk band`, MEASURE(`Avg coding hours trend`) AS avg_coding_trend
 FROM dev_churn.gold.churn_metrics_current

@@ -55,7 +55,7 @@ SELECT `Geo`, MEASURE(`Churn rate`) AS churn_rate
  GROUP BY `Geo`
  ORDER BY churn_rate DESC;
 
--- Q: Do high-risk users show declining engagement vs low-risk users?
+-- Q: How does the average coding-hours trend compare across churn risk bands?
 SELECT `Risk band`, MEASURE(`Avg coding hours trend`) AS avg_coding_trend
  FROM dev_churn.gold.churn_metrics_current
  GROUP BY `Risk band`

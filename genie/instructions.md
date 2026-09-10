@@ -53,3 +53,9 @@ up-weights the rare churn class, so scores run well above the true ~3–5% month
 **Never report it as "X% of users will churn."** Quantify risk with **risk-band counts**
 and **MRR at risk** (the *MRR at risk* measure sliced by *Risk band*), and rank
 individuals by score. There is intentionally no "churn probability" measure to report.
+
+## Return raw numeric values
+
+Do not wrap result columns in `ROUND()` or `FORMAT_NUMBER` — return raw numeric values
+and let the client format them. Rounding alters the values and breaks exact-match
+comparison during benchmark evaluation.
