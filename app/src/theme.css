@@ -1,0 +1,54 @@
+/* Design tokens — the re-skin mechanism. Every color is a semantic token; a brand is
+   just a token set. `data-brand` on <html> selects the brand. Ported from the design
+   mockup (docs/app-mockup.html). */
+
+:root {
+  color-scheme: light;
+  --bg:#eef1f2; --surface:#ffffff; --surface-2:#f6f8f8; --surface-3:#eef2f2;
+  --border:#dbe2e3; --border-strong:#c4cfd0;
+  --text:#182d34; --muted:#5c6f74; --faint:#84979b;
+  --brand:#ff3621; --brand-ink:#c42a19;
+  --action:#182d34; --action-hover:#2a444d; --on-action:#ffffff;
+  --risk-high:#d64327; --risk-high-bg:#fbe9e5;
+  --risk-med:#b5760f;  --risk-med-bg:#f8eed8;
+  --risk-low:#1f8a5b;  --risk-low-bg:#e2f2ea;
+  --good:#1f8a5b; --warn:#b5760f;
+  --grid:#e7ecec;
+  --shadow: 0 1px 2px rgba(24,45,52,.06), 0 8px 24px -12px rgba(24,45,52,.18);
+  --shadow-lift: 0 2px 4px rgba(24,45,52,.08), 0 18px 40px -18px rgba(24,45,52,.28);
+  --radius:12px; --radius-sm:8px;
+  --font-display:"Archivo",system-ui,sans-serif;
+  --font-body:"Inter",system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+
+:root[data-brand="anysphere"] {
+  color-scheme: dark;
+  --bg:#0c0d10; --surface:#16181d; --surface-2:#1b1e24; --surface-3:#20242b;
+  --border:#2a2f38; --border-strong:#3a414c;
+  --text:#e9ebf0; --muted:#98a0af; --faint:#6b7280;
+  --brand:#7aa2ff; --brand-ink:#9bb8ff;
+  --action:#7aa2ff; --action-hover:#93b3ff; --on-action:#0c0d10;
+  --risk-high:#ff6f5c; --risk-high-bg:#2a1815;
+  --risk-med:#e6b143;  --risk-med-bg:#271f10;
+  --risk-low:#48d69a;  --risk-low-bg:#0f2119;
+  --good:#48d69a; --warn:#e6b143;
+  --grid:#23272f;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -12px rgba(0,0,0,.6);
+  --shadow-lift: 0 2px 6px rgba(0,0,0,.5), 0 22px 48px -18px rgba(0,0,0,.75);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+.app {
+  min-height:100vh; background:var(--bg); color:var(--text);
+  font-family:var(--font-body); font-size:15px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  transition:background-color .45s ease, color .45s ease;
+}
+h1,h2,h3 { font-family:var(--font-display); margin:0; text-wrap:balance; letter-spacing:-.01em; }
+.mono { font-family:var(--font-mono); }
+.num { font-variant-numeric:tabular-nums; }
+button { font-family:inherit; }
+:focus-visible { outline:2px solid var(--brand); outline-offset:2px; border-radius:4px; }
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }

@@ -1,0 +1,25 @@
+# Databricks App manifest — Retention Cockpit (Stage 6).
+#
+# The app runs as its service principal. DATABRICKS_HOST and the OAuth token are
+# injected by the Apps runtime; the warehouse id and Genie space are pinned here so
+# the app reads the SAME governed semantic layer as Genie. Lakebase connection vars
+# (for the "do this now" queue) are supplied as app resources / secrets — see README.
+#
+# Grants the app SP needs (least-privilege, per-stage governance model):
+#   - SQL warehouse 128c306447d9ef00: CAN USE
+#   - UC: SELECT on dev_churn.gold.churn_serving, .churn_predictions,
+#         dev_churn.silver.churn_labels; EXECUTE on dev_churn.gold.at_risk_users,
+#         .untouched_at_risk_users
+#   - Lakebase Postgres: GRANT SELECT ON public.churn_serving, public.churn_predictions
+#         TO <app_sp_role>   (the grant Stage 3 deferred to here)
+#   - Genie space 01f1ad360e121f099e3070de938cd8cb: CAN RUN
+
+command: ["npm", "run", "start"]
+
+env:
+  - name: DATABRICKS_WAREHOUSE_ID
+    value: "128c306447d9ef00"
+  - name: GENIE_SPACE_ID
+    value: "01f1ad360e121f099e3070de938cd8cb"
+  - name: DATA_CATALOG
+    value: "dev_churn"
