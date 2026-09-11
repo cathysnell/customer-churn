@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useAsync } from "../hooks/useAsync";
-import { money } from "../lib/format";
+import { money, trendArrow, trendClass, trendLabel } from "../lib/format";
 
 // Pre-generated per-persona re-engagement drafts (decision #5: pre-generated, with a
 // clean seam to swap in a live Agent Bricks / Foundation Model call later).
@@ -18,16 +18,34 @@ const DRAFTS: Record<string, string> = {
     "Hey — hope the term's going well! Your usage dropped off recently. Your student plan stays active, and here are a couple of features worth a look for coursework. — Your Cursor team",
 };
 
-function Sparkline({ endTrend }: { endTrend: number }) {
-  const decline = [4.2, 4.0, 3.9, 3.6, 3.2, 2.9, 2.7, Math.max(2.4, endTrend * 4)];
-  const W = 380, H = 64, mx = Math.max(...decline), mn = Math.min(...decline);
-  const X = (i: number) => 6 + ((W - 12) * i) / (decline.length - 1);
-  const Y = (v: number) => H - 8 - ((H - 16) * (v - mn)) / (mx - mn || 1);
-  const p = decline.map((v, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(" ");
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const monthShort = (iso: string) => MONTHS[Math.max(0, Number(iso.slice(5, 7)) - 1)] ?? "";
+
+// Real monthly coding-hours line (avg daily hours per month, oldest → newest), colored
+// by the same direction as the headline. The last point is emphasized and labelled.
+function CodingSpark({ points, color }: { points: { month: string; hours: number }[]; color: string }) {
+  const W = 380, H = 74;
+  if (points.length < 2) return null;
+  const ys = points.map((p) => p.hours);
+  const mn = Math.min(...ys), mx = Math.max(...ys);
+  const pad = (mx - mn) * 0.25 || 0.5;
+  const lo = mn - pad, hi = mx + pad;
+  const X = (i: number) => 30 + ((W - 60) * i) / (points.length - 1);
+  const Y = (v: number) => H - 20 - ((H - 34) * (v - lo)) / (hi - lo || 1);
+  const path = points.map((p, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(p.hours).toFixed(1)}`).join(" ");
+  const last = points.length - 1;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}>
-      <path d={p} fill="none" stroke="var(--risk-high)" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={X(decline.length - 1)} cy={Y(decline[decline.length - 1])} r={3.5} fill="var(--risk-high)" />
+      <path d={path} fill="none" stroke={color} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
+      {points.map((p, i) => (
+        <circle key={i} cx={X(i)} cy={Y(p.hours)} r={i === last ? 4 : 2.6} fill={color} />
+      ))}
+      <text x={X(last)} y={Y(points[last].hours) - 9} textAnchor="middle" fontSize={10.5} fontWeight={700} fill="var(--text)">
+        {points[last].hours}h
+      </text>
+      {points.map((p, i) => (
+        <text key={i} x={X(i)} y={H - 4} textAnchor="middle" fontSize={9.5} fill="var(--muted)">{monthShort(p.month)}</text>
+      ))}
     </svg>
   );
 }
@@ -35,6 +53,10 @@ function Sparkline({ endTrend }: { endTrend: number }) {
 export function UserDrawer({ userId, onClose }: { userId: string | null; onClose: () => void }) {
   const open = userId !== null;
   const detail = useAsync(() => (userId ? api.user(userId) : Promise.resolve(null)), [userId]);
+  const history = useAsync(
+    () => (userId ? api.codingHistory(userId, 3) : Promise.resolve([])),
+    [userId],
+  );
   const [toast, setToast] = useState("");
 
   useEffect(() => {
@@ -43,9 +65,26 @@ export function UserDrawer({ userId, onClose }: { userId: string | null; onClose
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // Lock the background page scroll while the drawer is open, so the wheel scrolls
+  // the drawer body (not the greyed-out page behind it).
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   const u = detail.data;
-  const dropPct = u ? Math.round((1 - u.codingTrend) * 100) : 0;
   const riskColor = u ? (u.band === "medium" ? "var(--risk-med)" : `var(--risk-${u.band})`) : undefined;
+  const trendDir = u ? trendClass(u.codingTrend) : "flat";
+  const trendColor =
+    trendDir === "up" ? "var(--good)" : trendDir === "dn" ? "var(--risk-high)" : "var(--muted)";
+  const trendCaption =
+    trendDir === "up" ? "Coding activity is rising"
+    : trendDir === "dn" ? "Coding activity is falling"
+    : "Coding activity is flat";
 
   async function logOutreach() {
     if (!u) return;
@@ -69,14 +108,20 @@ export function UserDrawer({ userId, onClose }: { userId: string | null; onClose
             </div>
             <div className="dwr-b">
               <div className="sig">
-                <div className="cap">The decline signal · last 8 weeks</div>
-                <div className="sigrow"><span style={{ fontSize: 13, color: "var(--muted)" }}>Daily coding hours, trending down</span><span className="v">▼ {dropPct}%</span></div>
-                <Sparkline endTrend={u.codingTrend} />
+                <div className="cap">Coding hours · last {history.data?.length ?? 3} months</div>
+                <div className="sigrow">
+                  <span style={{ fontSize: 13, color: "var(--muted)" }}>{trendCaption} vs prior month</span>
+                  <span className="v" style={{ color: trendColor }}>{trendArrow(u.codingTrend)} {trendLabel(u.codingTrend)}</span>
+                </div>
+                <CodingSpark
+                  points={(history.data ?? []).map((p) => ({ month: p.month, hours: p.codingHours }))}
+                  color={trendColor}
+                />
               </div>
               <div className="statgrid">
                 <div><div className="k">Churn risk</div><div className="v" style={{ color: riskColor }}>{u.band} · {u.score.toFixed(2)}</div></div>
-                <div><div className="k">MRR</div><div className="v">{money(u.mrr)}</div></div>
-                <div><div className="k">Coding-hours trend</div><div className="v">{u.codingTrend.toFixed(2)}×</div></div>
+                <div><div className="k">MRR (USD/mo)</div><div className="v">{money(u.mrr)}</div></div>
+                <div><div className="k">Coding hrs vs prior mo</div><div className="v">{trendArrow(u.codingTrend)} {trendLabel(u.codingTrend)}</div></div>
                 <div><div className="k">CRM touches 30d</div><div className="v" style={u.crmTouches === 0 ? { color: "var(--risk-high)" } : undefined}>{u.crmTouches}</div></div>
                 <div><div className="k">AI acceptance</div><div className="v">{Math.round(u.avgAcceptanceRate * 100)}%</div></div>
                 <div><div className="k">Sessions / wk</div><div className="v">{u.avgSessionFrequency.toFixed(1)}</div></div>

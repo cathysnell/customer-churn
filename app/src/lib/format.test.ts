@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { geoSeverity, money, moneyShort, pct, trendArrow, trendClass } from "./format";
+import { geoSeverity, money, moneyShort, pct, trendArrow, trendClass, trendLabel } from "./format";
 import { atRiskUrl } from "./api";
 
 describe("formatters", () => {
@@ -16,12 +16,23 @@ describe("formatters", () => {
     expect(pct(3.25)).toBe("3.25%");
     expect(pct(4, 1)).toBe("4.0%");
   });
-  it("trend arrow + class by direction", () => {
-    expect(trendClass(0.62)).toBe("dn");
+  it("trend arrow + class by direction (1.0 = flat, ±3% dead-band)", () => {
+    expect(trendClass(0.62)).toBe("dn"); // −38%, declining
     expect(trendArrow(0.62)).toBe("▼");
-    expect(trendClass(1.03)).toBe("up");
-    expect(trendArrow(1.03)).toBe("▲");
-    expect(trendClass(0.95)).toBe("flat");
+    expect(trendClass(0.0)).toBe("dn"); // coding stopped = worst, not flat
+    expect(trendClass(1.0)).toBe("flat"); // unchanged
+    expect(trendArrow(1.0)).toBe("—");
+    expect(trendClass(0.97)).toBe("flat"); // within dead-band
+    expect(trendClass(1.1)).toBe("up"); // +10%, growing
+    expect(trendArrow(1.1)).toBe("▲");
+  });
+
+  it("trendLabel: percent change from flat, unsigned (arrow gives direction)", () => {
+    expect(trendLabel(1.0)).toBe("flat");
+    expect(trendLabel(0.97)).toBe("flat");
+    expect(trendLabel(0.62)).toBe("38%");
+    expect(trendLabel(0.0)).toBe("100%");
+    expect(trendLabel(1.78)).toBe("78%");
   });
   it("geoSeverity buckets churn", () => {
     expect(geoSeverity(3.99)).toBe("high");

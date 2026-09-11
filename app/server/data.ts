@@ -5,6 +5,7 @@
 import type {
   AtRiskFilters,
   AtRiskUser,
+  CodingPoint,
   GenieAnswer,
   GeoChurn,
   Kpis,
@@ -19,10 +20,12 @@ import { askGenie } from "./genie.js";
 import {
   atRiskSql,
   buildKpis,
+  codingHistorySql,
   geoChurnSql,
   latestChurnPct,
   latestChurnSql,
   mapAtRisk,
+  mapCodingHistory,
   mapGeo,
   mapMrrByBand,
   mapTrend,
@@ -39,6 +42,7 @@ export interface DataApi {
   getAtRisk(filters: AtRiskFilters): Promise<AtRiskUser[]>;
   getDoNow(limit: number): Promise<AtRiskUser[]>;
   getUser(id: string): Promise<UserDetail | null>;
+  getCodingHistory(id: string, months: number): Promise<CodingPoint[]>;
   ask(question: string): Promise<GenieAnswer>;
   outreach(userId: string): OutreachResult;
   doNowSource(): "lakebase" | "warehouse";
@@ -75,6 +79,9 @@ export function createDataApi(cfg: AppConfig): DataApi {
     async getUser(id) {
       const rows = await wh(userDetailSql(cat, id));
       return mapUserDetail(rows[0]);
+    },
+    async getCodingHistory(id, months) {
+      return mapCodingHistory(await wh(codingHistorySql(cat, id, months)));
     },
     async ask(question) {
       return askGenie(cfg, question);

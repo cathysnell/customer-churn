@@ -16,17 +16,30 @@ export function pct(n: number, digits = 2): string {
   return n.toFixed(digits) + "%";
 }
 
-/** CSS class suffix for a trend arrow (coding_hours_trend_30d). */
-export function trendClass(t: number): "dn" | "up" | "flat" {
-  if (t < 0.9) return "dn";
-  if (t > 1) return "up";
+// coding_hours_trend_30d is a RATIO of this month's mean coding hours to last month's:
+// 1.0 = flat, <1 = declining (0.0 = coding stopped entirely), >1 = growing. We render it
+// as a percent change from flat and color by direction, with a ±3% "flat" dead-band.
+const FLAT_LO = 0.97;
+const FLAT_HI = 1.03;
+
+/** Color by direction: declining = red (dn), ~flat = grey, growing = green (up). */
+export function trendClass(ratio: number): "dn" | "up" | "flat" {
+  if (ratio < FLAT_LO) return "dn";
+  if (ratio > FLAT_HI) return "up";
   return "flat";
 }
 
-export function trendArrow(t: number): string {
-  if (t < 0.9) return "▼";
-  if (t > 1) return "▲";
+export function trendArrow(ratio: number): string {
+  if (ratio < FLAT_LO) return "▼";
+  if (ratio > FLAT_HI) return "▲";
   return "—";
+}
+
+/** Unsigned magnitude of the change from flat; the arrow conveys direction.
+ *  0.62 → "38%", 1.0 → "flat", 0.0 → "100%", 1.78 → "78%". */
+export function trendLabel(ratio: number): string {
+  if (ratio >= FLAT_LO && ratio <= FLAT_HI) return "flat";
+  return Math.abs(Math.round((ratio - 1) * 100)) + "%";
 }
 
 /** CSS severity class for a churn-by-region bar. */
