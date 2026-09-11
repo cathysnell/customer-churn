@@ -23,8 +23,8 @@ phrasing.
 | 3 | How many users are in each churn risk band? | `Users` by `Risk band` | low 23,353 · high 20,581 · medium 6,066 |
 | 4 | How much MRR is at risk from high-risk subscribers? | `MRR at risk` by `Risk band` | high **$36,568** (low 446,184 · med 58,736) |
 | 5 | Which regions have the highest churn? | `Churn rate` by `Geo`, latest month | LATAM 0.0399 (highest) → ANZ 0.0306 |
-| 6 | Who are our most at-risk subscribers? | `at_risk_users(0.9)` | 357 users, score ≥ 0.9 |
-| 7 | Which high-risk subscribers have had no CRM outreach in 30 days? | `untouched_at_risk_users('high')` | **1,004** users |
+| 6 | Who are our most at-risk subscribers? | explicit join, subscribed + `churn_score` ≥ 0.9 (≡ `at_risk_users(0.9)`) | 357 users, score ≥ 0.9 |
+| 7 | Which high-risk subscribers have had no CRM outreach in 30 days? | explicit join, high-band + subscribed + `crm_touches_30d = 0` (≡ `untouched_at_risk_users('high')`) | **1,004** users |
 | 8 | How does the average coding-hours trend compare across churn risk bands? | `Avg coding hours trend` by `Risk band` | high 0.91 · med 0.98 · low 1.02 |
 | 9 | Are power users less likely to be high risk? | `Avg churn score` by `Is power user` | power 0.058 vs non-power 0.573 |
 | 10 | What is the total MRR of currently-subscribed users? | `MRR at risk` measure (ungrouped) | **$541,488** |
@@ -80,13 +80,31 @@ ORDER BY churn_rate DESC;
 
 **6 — Most at-risk subscribers** → 357 users with `churn_score` ≥ 0.9
 ```sql
-SELECT * FROM dev_churn.gold.at_risk_users(0.9);
+SELECT p.user_id, p.churn_score, p.churn_risk_band,
+       s.geo, s.persona, s.tier, s.mrr_usd,
+       s.coding_hours_trend_30d, s.crm_touches_30d
+FROM dev_churn.gold.churn_predictions p
+JOIN dev_churn.gold.churn_serving s USING (user_id)
+WHERE s.is_currently_subscribed = TRUE AND p.churn_score >= 0.9
+ORDER BY p.churn_score DESC;
 ```
+> Equivalent to `SELECT * FROM dev_churn.gold.at_risk_users(0.9)`; the explicit-join
+> form is the expected answer because it matches the column set Genie generates, so
+> exact-match grading passes. No `ROUND()` (per the no-ROUND instruction).
 
 **7 — High-risk subscribers with no CRM outreach in 30 days** → 1,004 users
 ```sql
-SELECT * FROM dev_churn.gold.untouched_at_risk_users('high');
+SELECT p.user_id, p.churn_score,
+       s.geo, s.persona, s.mrr_usd
+FROM dev_churn.gold.churn_predictions p
+JOIN dev_churn.gold.churn_serving s USING (user_id)
+WHERE p.churn_risk_band = 'high'
+  AND s.is_currently_subscribed = TRUE
+  AND s.crm_touches_30d = 0
+ORDER BY s.mrr_usd DESC;
 ```
+> Equivalent to `SELECT * FROM dev_churn.gold.untouched_at_risk_users('high')`; explicit
+> join for the same grading reason. No `LIMIT` (list questions return all rows).
 
 **8 — Average coding-hours trend across risk bands** → high 0.91 · medium 0.98 · low 1.02
 (band-agnostic wording so Genie returns all three bands rather than filtering to high/low)

@@ -39,13 +39,9 @@ SELECT p.user_id,
  LIMIT 50;
 
 -- Q: How much monthly recurring revenue is at risk from high-risk subscribers?
-SELECT p.churn_risk_band,
-        COUNT(*) AS users,
-        ROUND(SUM(s.mrr_usd), 2) AS mrr_at_risk
- FROM dev_churn.gold.churn_predictions p
- JOIN dev_churn.gold.churn_serving s USING (user_id)
- WHERE s.is_currently_subscribed = TRUE
- GROUP BY p.churn_risk_band
+SELECT `Risk band`, MEASURE(`MRR at risk`) AS mrr_at_risk
+ FROM dev_churn.gold.churn_metrics_current
+ GROUP BY `Risk band`
  ORDER BY mrr_at_risk DESC;
 
 -- Q: Which regions have the highest churn?
@@ -88,5 +84,10 @@ SELECT `Is power user`, MEASURE(`Avg churn score`) AS avg_churn_score
  GROUP BY `Is power user`;
 
 -- Q: Who are our most at-risk subscribers?
-SELECT *
- FROM dev_churn.gold.at_risk_users(0.9);
+SELECT p.user_id, ROUND(p.churn_score, 3) AS churn_score, p.churn_risk_band,
+        s.geo, s.persona, s.tier, s.mrr_usd,
+        ROUND(s.coding_hours_trend_30d, 2) AS coding_hours_trend_30d, s.crm_touches_30d
+ FROM dev_churn.gold.churn_predictions p
+ JOIN dev_churn.gold.churn_serving s USING (user_id)
+ WHERE s.is_currently_subscribed = TRUE AND p.churn_score >= 0.9
+ ORDER BY p.churn_score DESC;

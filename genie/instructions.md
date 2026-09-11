@@ -54,8 +54,35 @@ up-weights the rare churn class, so scores run well above the true ~3–5% month
 and **MRR at risk** (the *MRR at risk* measure sliced by *Risk band*), and rank
 individuals by score. There is intentionally no "churn probability" measure to report.
 
-## Return raw numeric values
+### Comparing churn risk across groups
+
+When comparing churn risk across groups (power users vs non-power users, personas,
+regions), use *Avg churn score* from `churn_metrics_current` as the risk measure. Do not
+compute a ratio of high-risk user counts to total users.
+
+### Interpreting 'highest' or 'most' in aggregate questions
+
+When the user asks "which X has the highest Y" or "which X has the most Y," return all
+rows ordered by Y descending. Do not use `RANK()`, `ROW_NUMBER()`, or `LIMIT` to return
+only the top row unless the user explicitly asks for "the single highest," "top 1," or
+"the #1."
+
+### MRR at risk measure usage
+
+The *MRR at risk* measure on `churn_metrics_current` already filters to currently
+subscribed users — do not add a redundant `is_currently_subscribed = TRUE` condition.
+When asked about MRR at risk, always group by *Risk band* to show all bands unless the
+user explicitly requests a single band.
+
+### Return raw numeric values
 
 Do not wrap result columns in `ROUND()` or `FORMAT_NUMBER` — return raw numeric values
 and let the client format them. Rounding alters the values and breaks exact-match
 comparison during benchmark evaluation.
+
+### List questions return all matching rows
+
+For "which/who" list questions (e.g. which subscribers, who are the users), return ALL
+matching rows — do not add a `LIMIT` — unless the user explicitly asks for a top-N
+("top 10", "first 20"). Prefer the trusted functions `at_risk_users()` /
+`untouched_at_risk_users()` for these asks.

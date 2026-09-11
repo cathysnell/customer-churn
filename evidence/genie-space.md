@@ -163,15 +163,38 @@ put the expected answers in a contradictory state to begin with). Options, best 
 Not recommended: putting `ROUND()` back into the expected answers — Genie rounds only
 *some* runs, so no single expected answer (raw or rounded) matches both variants.
 
-## Repo sync status
+## Decision + outcome (2026-09-10)
 
-The repo's `genie/benchmarks.md` + `example_queries.sql` + `instructions.md` still
-reflect the pre-Genie-code metric-view answer forms plus two targeted edits
-(no-ROUND rule, Q8 reword). They have **not** been fully re-synced to the live space's
-current (Genie-code-mutated + hand-corrected) benchmark answers, since that state is
-still in flux pending the grading-philosophy decision above. Full re-sync
-(`genie get-space <id> --include-serialized-space` → repo) should happen once the
-benchmark set is finalized/accepted.
+**Accepted 9/10 as passing** (recommendation option 2). The substance is there on all
+10 — Genie routes to the metric views / trusted functions and returns analytically
+correct results; the one rotating miss (Q6 ⇄ Q7) is cosmetic `ROUND()` non-determinism
+against exact-match grading, not a modeling or ontology defect. The score arc for the
+Stage-5 space:
+
+> **4/10 baseline** (ontology not wired in) → wired metric views + functions as data
+> sources / trusted assets, moved examples to `MEASURE()`/function forms → **6 → 8**
+> → corrected contradictory expected answers (Q8 all-bands, Q6/Q7 no-ROUND, Q7 no-LIMIT)
+> → **9/10, stable** (remaining gap = LLM run-to-run rounding variance).
+
+Final accepted run: `01f1ad6fedb11564a0321645b1aacc0a` — **9 GOOD / 1 NEEDS_REVIEW**.
+
+## Repo sync status — SYNCED (2026-09-10)
+
+The repo now mirrors the accepted live space, pulled via
+`genie get-space 01f1ad360e121f099e3070de938cd8cb --include-serialized-space`:
+
+- **`instructions.md`** — added the four calibration subsections Genie-code introduced
+  during tuning (comparing risk across groups → use *Avg churn score*; "highest/most"
+  returns all rows, no `LIMIT`/`RANK()`; *MRR at risk* already filters subscribed +
+  group by all bands; list questions return all rows).
+- **`example_queries.sql`** — Q5 (MRR at risk) now the `MEASURE()` form; Q11 (most
+  at-risk) now the explicit subscribed + `churn_score ≥ 0.9` join, matching live.
+- **`benchmarks.md`** — Q6/Q7 expected answers updated to the explicit-join forms the
+  live space grades against (each noted as equivalent to its trusted function; no
+  `ROUND()`, no `LIMIT`). Q1's answer is kept in the equivalent `ORDER BY Month DESC
+  LIMIT 1` form (returns the same `0.0325`; avoids the two-FROM subquery).
+
+Repo and live space are now consistent; re-sync again only if the space is retuned.
 
 ## Access / grants (per-stage model)
 
