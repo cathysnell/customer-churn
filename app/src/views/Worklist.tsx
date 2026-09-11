@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useAsync } from "../hooks/useAsync";
 import { RiskBadge } from "../components/RiskBadge";
-import { money, trendArrow, trendClass } from "../lib/format";
+import { money, trendArrow, trendClass, trendLabel } from "../lib/format";
 import { GEOS, RISK_BANDS, type RiskBand } from "../../shared/api";
 import { UserDrawer } from "./UserDrawer";
 
@@ -72,7 +72,7 @@ export function Worklist() {
           <table>
             <thead><tr>
               <th>User</th><th>Region</th><th>Persona</th><th>Plan</th>
-              <th className="r">MRR (USD/mo)</th><th>Risk</th><th className="r">Coding trend 30d</th><th className="r">CRM 30d</th>
+              <th className="r">MRR (USD/mo)</th><th>Risk</th><th className="r">Coding hrs vs prior mo</th><th className="r">CRM 30d</th>
             </tr></thead>
             <tbody>
               {rows.loading && <tr><td colSpan={8} className="state">Loading subscribers…</td></tr>}
@@ -86,7 +86,7 @@ export function Worklist() {
                   <td className="mono" style={{ fontSize: 12.5 }}>{u.plan}</td>
                   <td className="r num">{money(u.mrr)}</td>
                   <td><RiskBadge band={u.band} /></td>
-                  <td className="r"><span className={`trend ${trendClass(u.codingTrend)}`}>{trendArrow(u.codingTrend)} {u.codingTrend.toFixed(2)}×</span></td>
+                  <td className="r"><span className={`trend ${trendClass(u.codingTrend)}`}>{trendArrow(u.codingTrend)} {trendLabel(u.codingTrend)}</span></td>
                   <td className={`r ${u.crmTouches === 0 ? "crm0" : ""}`}>{u.crmTouches === 0 ? "0 · none" : u.crmTouches}</td>
                 </tr>
               ))}
