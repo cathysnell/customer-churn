@@ -86,7 +86,7 @@ export function UserDrawer({ userId, onClose }: { userId: string | null; onClose
               </div>
               <div className="statgrid">
                 <div><div className="k">Churn risk</div><div className="v" style={{ color: riskColor }}>{u.band} · {u.score.toFixed(2)}</div></div>
-                <div><div className="k">MRR</div><div className="v">{money(u.mrr)}</div></div>
+                <div><div className="k">MRR (USD/mo)</div><div className="v">{money(u.mrr)}</div></div>
                 <div><div className="k">Coding-hours trend</div><div className="v">{u.codingTrend.toFixed(2)}×</div></div>
                 <div><div className="k">CRM touches 30d</div><div className="v" style={u.crmTouches === 0 ? { color: "var(--risk-high)" } : undefined}>{u.crmTouches}</div></div>
                 <div><div className="k">AI acceptance</div><div className="v">{Math.round(u.avgAcceptanceRate * 100)}%</div></div>

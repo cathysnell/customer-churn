@@ -72,7 +72,7 @@ export function Worklist() {
           <table>
             <thead><tr>
               <th>User</th><th>Region</th><th>Persona</th><th>Plan</th>
-              <th className="r">MRR</th><th>Risk</th><th className="r">Coding trend 30d</th><th className="r">CRM 30d</th>
+              <th className="r">MRR (USD/mo)</th><th>Risk</th><th className="r">Coding trend 30d</th><th className="r">CRM 30d</th>
             </tr></thead>
             <tbody>
               {rows.loading && <tr><td colSpan={8} className="state">Loading subscribers…</td></tr>}
