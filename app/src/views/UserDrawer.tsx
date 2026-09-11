@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useAsync } from "../hooks/useAsync";
-import { money, trendArrow, trendLabel } from "../lib/format";
+import { money, trendArrow, trendClass, trendLabel } from "../lib/format";
 
 // Pre-generated per-persona re-engagement drafts (decision #5: pre-generated, with a
 // clean seam to swap in a live Agent Bricks / Foundation Model call later).
@@ -18,16 +18,24 @@ const DRAFTS: Record<string, string> = {
     "Hey — hope the term's going well! Your usage dropped off recently. Your student plan stays active, and here are a couple of features worth a look for coursework. — Your Cursor team",
 };
 
-function Sparkline({ endTrend }: { endTrend: number }) {
-  const decline = [4.2, 4.0, 3.9, 3.6, 3.2, 2.9, 2.7, Math.max(2.4, endTrend * 4)];
-  const W = 380, H = 64, mx = Math.max(...decline), mn = Math.min(...decline);
-  const X = (i: number) => 6 + ((W - 12) * i) / (decline.length - 1);
-  const Y = (v: number) => H - 8 - ((H - 16) * (v - mn)) / (mx - mn || 1);
-  const p = decline.map((v, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(" ");
+// Honest month-over-month line: prior month (normalized to 1.0) → this month (the
+// coding_hours_trend_30d ratio). We only have the two-month ratio, so we show exactly
+// that — no fabricated weekly history — colored by direction.
+function TrendSpark({ ratio, color }: { ratio: number; color: string }) {
+  const W = 380, H = 68;
+  const vals = [1, ratio];
+  const mn = Math.min(...vals), mx = Math.max(...vals);
+  const pad = (mx - mn) * 0.3 || 0.15;
+  const lo = mn - pad, hi = mx + pad;
+  const X = (i: number) => 34 + ((W - 68) * i) / (vals.length - 1);
+  const Y = (v: number) => H - 16 - ((H - 30) * (v - lo)) / (hi - lo || 1);
+  const p = vals.map((v, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(" ");
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}>
-      <path d={p} fill="none" stroke="var(--risk-high)" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={X(decline.length - 1)} cy={Y(decline[decline.length - 1])} r={3.5} fill="var(--risk-high)" />
+      <path d={p} fill="none" stroke={color} strokeWidth={2.4} strokeLinecap="round" />
+      {vals.map((v, i) => <circle key={i} cx={X(i)} cy={Y(v)} r={3.8} fill={color} />)}
+      <text x={X(0)} y={H - 2} textAnchor="middle" fontSize={9.5} fill="var(--muted)">prior mo</text>
+      <text x={X(1)} y={H - 2} textAnchor="middle" fontSize={9.5} fill="var(--muted)">this mo</text>
     </svg>
   );
 }
@@ -55,8 +63,14 @@ export function UserDrawer({ userId, onClose }: { userId: string | null; onClose
   }, [open]);
 
   const u = detail.data;
-  const dropPct = u ? Math.round((1 - u.codingTrend) * 100) : 0;
   const riskColor = u ? (u.band === "medium" ? "var(--risk-med)" : `var(--risk-${u.band})`) : undefined;
+  const trendDir = u ? trendClass(u.codingTrend) : "flat";
+  const trendColor =
+    trendDir === "up" ? "var(--good)" : trendDir === "dn" ? "var(--risk-high)" : "var(--muted)";
+  const trendCaption =
+    trendDir === "up" ? "Coding activity is rising"
+    : trendDir === "dn" ? "Coding activity is falling"
+    : "Coding activity is flat";
 
   async function logOutreach() {
     if (!u) return;
@@ -80,9 +94,12 @@ export function UserDrawer({ userId, onClose }: { userId: string | null; onClose
             </div>
             <div className="dwr-b">
               <div className="sig">
-                <div className="cap">The decline signal · last 8 weeks</div>
-                <div className="sigrow"><span style={{ fontSize: 13, color: "var(--muted)" }}>Daily coding hours, trending down</span><span className="v">▼ {dropPct}%</span></div>
-                <Sparkline endTrend={u.codingTrend} />
+                <div className="cap">Coding hours · this month vs prior</div>
+                <div className="sigrow">
+                  <span style={{ fontSize: 13, color: "var(--muted)" }}>{trendCaption}</span>
+                  <span className="v" style={{ color: trendColor }}>{trendArrow(u.codingTrend)} {trendLabel(u.codingTrend)}</span>
+                </div>
+                <TrendSpark ratio={u.codingTrend} color={trendColor} />
               </div>
               <div className="statgrid">
                 <div><div className="k">Churn risk</div><div className="v" style={{ color: riskColor }}>{u.band} · {u.score.toFixed(2)}</div></div>
