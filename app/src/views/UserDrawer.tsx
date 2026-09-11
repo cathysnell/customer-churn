@@ -43,6 +43,17 @@ export function UserDrawer({ userId, onClose }: { userId: string | null; onClose
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // Lock the background page scroll while the drawer is open, so the wheel scrolls
+  // the drawer body (not the greyed-out page behind it).
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   const u = detail.data;
   const dropPct = u ? Math.round((1 - u.codingTrend) * 100) : 0;
   const riskColor = u ? (u.band === "medium" ? "var(--risk-med)" : `var(--risk-${u.band})`) : undefined;

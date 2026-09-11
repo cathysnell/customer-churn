@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useAsync } from "../hooks/useAsync";
 import { RiskBadge } from "../components/RiskBadge";
@@ -13,13 +13,25 @@ export function Worklist() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
 
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
+
   const rows = useAsync(
-    () => api.atRisk({ band: band || undefined, geo: geo || undefined, noCrm: noCrm || undefined }),
+    () => api.atRisk({ band: band || undefined, geo: geo || undefined, noCrm: noCrm || undefined, limit: 500 }),
     [band, geo, noCrm],
   );
   const doNow = useAsync(() => api.doNow(500), []);
 
   const visible = (rows.data ?? []).filter((u) => !q || u.userId.toLowerCase().includes(q.toLowerCase()));
+
+  // Reset to page 1 whenever the filtered set changes.
+  useEffect(() => setPage(1), [band, geo, noCrm, q]);
+  const total = visible.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const pageRows = visible.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+  const from = total === 0 ? 0 : (pageSafe - 1) * PAGE_SIZE + 1;
+  const to = Math.min(pageSafe * PAGE_SIZE, total);
 
   return (
     <section>
@@ -65,8 +77,8 @@ export function Worklist() {
             <tbody>
               {rows.loading && <tr><td colSpan={8} className="state">Loading subscribers…</td></tr>}
               {rows.error && <tr><td colSpan={8} className="state err">{rows.error}</td></tr>}
-              {!rows.loading && visible.length === 0 && <tr><td colSpan={8} className="state">No subscribers match these filters.</td></tr>}
-              {visible.map((u) => (
+              {!rows.loading && total === 0 && <tr><td colSpan={8} className="state">No subscribers match these filters.</td></tr>}
+              {pageRows.map((u) => (
                 <tr key={u.userId} onClick={() => setSelected(u.userId)}>
                   <td className="uid">{u.userId}</td>
                   <td>{u.geo}</td>
@@ -82,6 +94,17 @@ export function Worklist() {
           </table>
         </div>
       </div>
+
+      {total > PAGE_SIZE && (
+        <div className="pager">
+          <span className="pinfo num">Showing {from}–{to} of {total}</span>
+          <div className="pbtns">
+            <button className="pbtn" disabled={pageSafe <= 1} onClick={() => setPage((p) => p - 1)}>← Prev</button>
+            <span className="ppage num">Page {pageSafe} of {totalPages}</span>
+            <button className="pbtn" disabled={pageSafe >= totalPages} onClick={() => setPage((p) => p + 1)}>Next →</button>
+          </div>
+        </div>
+      )}
 
       <UserDrawer userId={selected} onClose={() => setSelected(null)} />
     </section>
