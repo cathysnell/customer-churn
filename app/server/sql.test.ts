@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   atRiskSql,
   buildKpis,
+  codingHistorySql,
   isValidUserId,
   latestChurnPct,
   mapAtRisk,
+  mapCodingHistory,
   mapGeo,
   mapMrrByBand,
   mapTrend,
@@ -53,6 +55,15 @@ describe("query builders", () => {
     expect(() => userDetailSql("dev_churn", "a' OR '1'='1")).toThrow();
     expect(userDetailSql("dev_churn", "usr_1")).toContain("p.user_id = 'usr_1'");
   });
+  it("codingHistorySql validates id, clamps months, hits churn_labels", () => {
+    expect(() => codingHistorySql("dev_churn", "bad'id", 3)).toThrow();
+    const sql = codingHistorySql("dev_churn", "USR-1", 3);
+    expect(sql).toContain("dev_churn.silver.churn_labels");
+    expect(sql).toContain("CAST(month_start AS STRING)"); // avoid JS Date from the driver
+    expect(sql).toContain("user_id = 'USR-1'");
+    expect(sql).toContain("LIMIT 3");
+    expect(codingHistorySql("dev_churn", "USR-1", 999)).toContain("LIMIT 24"); // clamped
+  });
 });
 
 describe("mappers", () => {
@@ -99,6 +110,19 @@ describe("mappers", () => {
       crmTouches: 0,
     });
   });
+  it("mapCodingHistory reverses DESC rows to ascending and coerces", () => {
+    const pts = mapCodingHistory([
+      { month: "2026-05-01T00:00:00", coding_hours: "10.18" },
+      { month: "2026-04-01T00:00:00", coding_hours: "4.37" },
+      { month: "2026-03-01T00:00:00", coding_hours: "6.43" },
+    ]);
+    expect(pts).toEqual([
+      { month: "2026-03-01", codingHours: 6.43 },
+      { month: "2026-04-01", codingHours: 4.37 },
+      { month: "2026-05-01", codingHours: 10.18 },
+    ]);
+  });
+
   it("mapUserDetail returns null for missing row", () => {
     expect(mapUserDetail(undefined)).toBeNull();
     const d = mapUserDetail({

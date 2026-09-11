@@ -18,24 +18,34 @@ const DRAFTS: Record<string, string> = {
     "Hey — hope the term's going well! Your usage dropped off recently. Your student plan stays active, and here are a couple of features worth a look for coursework. — Your Cursor team",
 };
 
-// Honest month-over-month line: prior month (normalized to 1.0) → this month (the
-// coding_hours_trend_30d ratio). We only have the two-month ratio, so we show exactly
-// that — no fabricated weekly history — colored by direction.
-function TrendSpark({ ratio, color }: { ratio: number; color: string }) {
-  const W = 380, H = 68;
-  const vals = [1, ratio];
-  const mn = Math.min(...vals), mx = Math.max(...vals);
-  const pad = (mx - mn) * 0.3 || 0.15;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const monthShort = (iso: string) => MONTHS[Math.max(0, Number(iso.slice(5, 7)) - 1)] ?? "";
+
+// Real monthly coding-hours line (avg daily hours per month, oldest → newest), colored
+// by the same direction as the headline. The last point is emphasized and labelled.
+function CodingSpark({ points, color }: { points: { month: string; hours: number }[]; color: string }) {
+  const W = 380, H = 74;
+  if (points.length < 2) return null;
+  const ys = points.map((p) => p.hours);
+  const mn = Math.min(...ys), mx = Math.max(...ys);
+  const pad = (mx - mn) * 0.25 || 0.5;
   const lo = mn - pad, hi = mx + pad;
-  const X = (i: number) => 34 + ((W - 68) * i) / (vals.length - 1);
-  const Y = (v: number) => H - 16 - ((H - 30) * (v - lo)) / (hi - lo || 1);
-  const p = vals.map((v, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(" ");
+  const X = (i: number) => 30 + ((W - 60) * i) / (points.length - 1);
+  const Y = (v: number) => H - 20 - ((H - 34) * (v - lo)) / (hi - lo || 1);
+  const path = points.map((p, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(p.hours).toFixed(1)}`).join(" ");
+  const last = points.length - 1;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}>
-      <path d={p} fill="none" stroke={color} strokeWidth={2.4} strokeLinecap="round" />
-      {vals.map((v, i) => <circle key={i} cx={X(i)} cy={Y(v)} r={3.8} fill={color} />)}
-      <text x={X(0)} y={H - 2} textAnchor="middle" fontSize={9.5} fill="var(--muted)">prior mo</text>
-      <text x={X(1)} y={H - 2} textAnchor="middle" fontSize={9.5} fill="var(--muted)">this mo</text>
+      <path d={path} fill="none" stroke={color} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
+      {points.map((p, i) => (
+        <circle key={i} cx={X(i)} cy={Y(p.hours)} r={i === last ? 4 : 2.6} fill={color} />
+      ))}
+      <text x={X(last)} y={Y(points[last].hours) - 9} textAnchor="middle" fontSize={10.5} fontWeight={700} fill="var(--text)">
+        {points[last].hours}h
+      </text>
+      {points.map((p, i) => (
+        <text key={i} x={X(i)} y={H - 4} textAnchor="middle" fontSize={9.5} fill="var(--muted)">{monthShort(p.month)}</text>
+      ))}
     </svg>
   );
 }
@@ -43,6 +53,10 @@ function TrendSpark({ ratio, color }: { ratio: number; color: string }) {
 export function UserDrawer({ userId, onClose }: { userId: string | null; onClose: () => void }) {
   const open = userId !== null;
   const detail = useAsync(() => (userId ? api.user(userId) : Promise.resolve(null)), [userId]);
+  const history = useAsync(
+    () => (userId ? api.codingHistory(userId, 3) : Promise.resolve([])),
+    [userId],
+  );
   const [toast, setToast] = useState("");
 
   useEffect(() => {
@@ -94,12 +108,15 @@ export function UserDrawer({ userId, onClose }: { userId: string | null; onClose
             </div>
             <div className="dwr-b">
               <div className="sig">
-                <div className="cap">Coding hours · this month vs prior</div>
+                <div className="cap">Coding hours · last {history.data?.length ?? 3} months</div>
                 <div className="sigrow">
-                  <span style={{ fontSize: 13, color: "var(--muted)" }}>{trendCaption}</span>
+                  <span style={{ fontSize: 13, color: "var(--muted)" }}>{trendCaption} vs prior month</span>
                   <span className="v" style={{ color: trendColor }}>{trendArrow(u.codingTrend)} {trendLabel(u.codingTrend)}</span>
                 </div>
-                <TrendSpark ratio={u.codingTrend} color={trendColor} />
+                <CodingSpark
+                  points={(history.data ?? []).map((p) => ({ month: p.month, hours: p.codingHours }))}
+                  color={trendColor}
+                />
               </div>
               <div className="statgrid">
                 <div><div className="k">Churn risk</div><div className="v" style={{ color: riskColor }}>{u.band} · {u.score.toFixed(2)}</div></div>

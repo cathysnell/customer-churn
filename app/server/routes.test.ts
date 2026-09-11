@@ -28,6 +28,11 @@ function mockDeps(over: Partial<DataApi> = {}): DataApi {
     getAtRisk: vi.fn(async () => [sampleUser]),
     getDoNow: vi.fn(async () => [sampleUser]),
     getUser: vi.fn(async () => ({ ...sampleUser, avgAcceptanceRate: 0.24, avgSessionFrequency: 2.1, supportTickets: 3, tenureMonths: 14, isCurrentlySubscribed: true }) as UserDetail),
+    getCodingHistory: vi.fn(async () => [
+      { month: "2026-03-01", codingHours: 6.43 },
+      { month: "2026-04-01", codingHours: 4.37 },
+      { month: "2026-05-01", codingHours: 10.18 },
+    ]),
     ask: vi.fn(async (q: string): Promise<GenieAnswer> => ({ question: q, text: "answer", sql: "SELECT 1", columns: ["a"], rows: [[1]] })),
     outreach: vi.fn((userId: string) => ({ logged: true as const, userId, simulated: true as const })),
     doNowSource: vi.fn(() => "lakebase" as const),
@@ -79,6 +84,20 @@ describe("routes", () => {
     const app = await makeApp(mockDeps({ getUser: vi.fn(async () => null) }));
     expect((await app.inject({ method: "GET", url: "/api/user/bad'id" })).statusCode).toBe(400);
     expect((await app.inject({ method: "GET", url: "/api/user/usr_x" })).statusCode).toBe(404);
+  });
+
+  it("GET /api/user/:id/coding-history returns the monthly series (default 3)", async () => {
+    const app = await makeApp(deps);
+    const res = await app.inject({ method: "GET", url: "/api/user/USR-1/coding-history" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toHaveLength(3);
+    expect(deps.getCodingHistory).toHaveBeenCalledWith("USR-1", 3);
+  });
+
+  it("GET /api/user/:id/coding-history 400s on a bad id", async () => {
+    const app = await makeApp(deps);
+    const res = await app.inject({ method: "GET", url: "/api/user/bad'id/coding-history" });
+    expect(res.statusCode).toBe(400);
   });
 
   it("POST /api/genie/query requires a question", async () => {

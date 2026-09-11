@@ -3,6 +3,7 @@
 import type {
   AtRiskFilters,
   AtRiskUser,
+  CodingPoint,
   GenieAnswer,
   GeoChurn,
   Kpis,
@@ -46,6 +47,8 @@ export const api = {
   atRisk: (f: AtRiskFilters = {}) => getJson<AtRiskUser[]>(atRiskUrl(f)),
   doNow: (limit = 100) => getJson<AtRiskUser[]>(`/api/do-now?limit=${limit}`),
   user: (id: string) => getJson<UserDetail>(`/api/user/${encodeURIComponent(id)}`),
+  codingHistory: (id: string, months = 3) =>
+    getJson<CodingPoint[]>(`/api/user/${encodeURIComponent(id)}/coding-history?months=${months}`),
   ask: (question: string) => postJson<GenieAnswer>("/api/genie/query", { question }),
   outreach: (userId: string) => postJson<OutreachResult>("/api/outreach", { userId }),
 };

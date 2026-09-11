@@ -7,6 +7,7 @@ import {
   type AtRiskFilters,
   type AtRiskUser,
   type BandMrr,
+  type CodingPoint,
   type GeoChurn,
   type Kpis,
   type RiskBand,
@@ -129,6 +130,19 @@ export function userDetailSql(catalog: string, userId: string): string {
   );
 }
 
+/** Last `months` months of a user's avg coding hours, from the monthly label table. */
+export function codingHistorySql(catalog: string, userId: string, months: number): string {
+  if (!isValidUserId(userId)) throw new Error(`invalid user id: ${userId}`);
+  const n = Math.min(Math.max(Math.floor(num(months, 3)), 1), 24);
+  // CAST the DATE to STRING so the driver returns "YYYY-MM-DD", not a JS Date object.
+  return (
+    "SELECT CAST(month_start AS STRING) AS month, avg_coding_hours AS coding_hours " +
+    `FROM ${catalog}.silver.churn_labels ` +
+    `WHERE user_id = '${userId}' ` +
+    `ORDER BY month_start DESC LIMIT ${n}`
+  );
+}
+
 // ---- row mappers ----
 
 export function latestChurnPct(rows: Row[]): number {
@@ -147,6 +161,16 @@ export function mapGeo(rows: Row[]): GeoChurn[] {
     geo: String(r.geo ?? ""),
     churnRatePct: round2(num(r.churn_rate) * 100),
   }));
+}
+
+/** DESC query → ascending (oldest → newest) for charting. */
+export function mapCodingHistory(rows: Row[]): CodingPoint[] {
+  return rows
+    .map((r) => ({
+      month: String(r.month ?? "").slice(0, 10),
+      codingHours: round2(num(r.coding_hours)),
+    }))
+    .reverse();
 }
 
 export function mapMrrByBand(rows: Row[]): BandMrr[] {

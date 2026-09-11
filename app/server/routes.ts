@@ -65,6 +65,16 @@ export function buildRoutes(deps: DataApi): FastifyPluginAsync {
       return user;
     });
 
+    app.get<{ Params: { id: string }; Querystring: { months?: string } }>(
+      "/api/user/:id/coding-history",
+      async (req, reply) => {
+        const { id } = req.params;
+        if (!isValidUserId(id)) return reply.code(400).send({ error: "invalid user id" });
+        const months = req.query.months !== undefined ? Number(req.query.months) : 3;
+        return deps.getCodingHistory(id, months);
+      },
+    );
+
     app.post<{ Body: { question?: string } }>("/api/genie/query", async (req, reply) => {
       const question = (req.body?.question ?? "").trim();
       if (!question) return reply.code(400).send({ error: "question is required" });

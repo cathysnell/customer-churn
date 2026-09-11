@@ -60,6 +60,11 @@ export interface AtRiskFilters {
   limit?: number;
 }
 
+export interface CodingPoint {
+  month: string; // YYYY-MM-DD
+  codingHours: number; // avg daily coding hours that month
+}
+
 export interface GenieAnswer {
   question: string;
   text: string;
