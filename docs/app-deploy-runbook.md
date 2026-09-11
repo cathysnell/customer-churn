@@ -8,6 +8,12 @@ authenticated (`databricks auth login --profile fevm-serverless-stable-yuzk83`).
 Prereqs: Databricks CLI **≥ v0.239.0** (for `source_code_path`); the metric views,
 functions, and Genie space from Stages 3–5 already live (they are).
 
+> **Two env gotchas (hit on the first deploy — prefix every bundle command):**
+> A stale `DATABRICKS_WORKSPACE_ID` env var (`1965859176160743`) shadows the real
+> workspace id and fails the deploy with a `workspace_id mismatch`. Override it:
+> `DATABRICKS_WORKSPACE_ID=7474660065596768 databricks bundle …`. And the **default**
+> CLI profile is a different (lapsed) workspace — always pass `-p fevm-serverless-stable-yuzk83`.
+
 ## 1. Validate + deploy the app resource
 
 ```bash
@@ -47,11 +53,13 @@ databricks api post /api/2.0/sql/statements/ -p fevm-serverless-stable-yuzk83 \
 # …repeat for each GRANT in grants.sql (one statement per call)
 ```
 
-The app SP also needs **CAN RUN on the Genie space** for the Ask tab:
+The app SP also needs **CAN RUN on the Genie space** for the Ask tab (PATCH adds the SP
+without clobbering the existing ACL):
 
 ```bash
-databricks permissions update genie /api/2.0/genie/spaces/01f1ad360e121f099e3070de938cd8cb \
-  ... # or set CAN RUN in the Genie space UI → Permissions
+databricks api patch /api/2.0/permissions/genie/01f1ad360e121f099e3070de938cd8cb \
+  -p fevm-serverless-stable-yuzk83 \
+  --json '{"access_control_list":[{"service_principal_name":"<app_sp>","permission_level":"CAN_RUN"}]}'
 ```
 
 ## 4. (Optional) Lakebase for the "do this now" queue
@@ -83,8 +91,28 @@ the KPI numbers match the Genie space and `evidence/genie-space.md` (churn 3.25%
 risk high $36,568) — that consistency is the whole point of reading the shared metric
 views.
 
+## Deploy notes — first live deploy (2026-09-11)
+
+Deployed and verified live. App: `https://retention-cockpit-7474660065596768.aws.databricksapps.com`,
+SP `1768cda0-b24e-493f-8b2f-16fb8b8eda3a`, status RUNNING. Evidence:
+[`../evidence/app-served-responses.txt`](../evidence/app-served-responses.txt) +
+[`../evidence/app-deploy-status.txt`](../evidence/app-deploy-status.txt). KPIs match the
+Genie space exactly (churn 3.25%, MRR at risk high $36,568). Three fixes were needed:
+
+1. **npm proxy 404 on lockfile-pinned tarballs.** The Apps build ran `npm install`
+   against `npm-proxy.cloud.databricks.com` and 404'd fetching the exact pinned URL
+   `yallist-3.1.1.tgz`. Fix: exclude `app/package-lock.json` from the upload
+   (`sync.exclude` in `databricks.yml`) so the runtime resolves by name, not pinned URL.
+2. **Auth.** Apps inject the SP's OAuth **M2M** creds (`DATABRICKS_CLIENT_ID`/`SECRET`),
+   not a PAT. The warehouse driver now connects with `authType: "databricks-oauth"`, and
+   the Genie client mints an OAuth token from `${host}/oidc/v1/token`. PAT stays the
+   local-dev path.
+3. **Grants order.** `CAN_USE` on the warehouse is auto-granted by the bundle resource,
+   but the app 401/403'd until the UC `SELECT`/`EXECUTE` grants (`grants.sql`) and Genie
+   `CAN_RUN` were applied to the SP.
+
 ## Rollback / teardown
 
 ```bash
-databricks bundle destroy -t dev -p fevm-serverless-stable-yuzk83
+DATABRICKS_WORKSPACE_ID=7474660065596768 databricks bundle destroy -t dev -p fevm-serverless-stable-yuzk83
 ```

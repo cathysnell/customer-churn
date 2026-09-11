@@ -1,0 +1,29 @@
+{
+  "name": "retention-cockpit",
+  "url": "https://retention-cockpit-7474660065596768.aws.databricksapps.com",
+  "service_principal_client_id": "1768cda0-b24e-493f-8b2f-16fb8b8eda3a",
+  "service_principal_id": 72748879366954,
+  "app_status": {
+    "message": "App has status: App is running",
+    "state": "RUNNING"
+  },
+  "compute_status": {
+    "message": "App compute is running.",
+    "state": "ACTIVE"
+  },
+  "active_deployment": {
+    "create_time": "2026-09-11T05:36:57Z",
+    "creator": "cathy.snell@databricks.com",
+    "deployment_artifacts": {
+      "source_code_path": "/Workspace/Users/1768cda0-b24e-493f-8b2f-16fb8b8eda3a/src/01f1ada2cdba15c4a411211b343a2502"
+    },
+    "deployment_id": "01f1ada2cdba15c4a411211b343a2502",
+    "mode": "SNAPSHOT",
+    "source_code_path": "/Workspace/Users/cathy.snell@databricks.com/.bundle/retention-cockpit/dev/files/app",
+    "status": {
+      "message": "App started successfully",
+      "state": "SUCCEEDED"
+    },
+    "update_time": "2026-09-11T05:37:37Z"
+  }
+}
