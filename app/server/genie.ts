@@ -1,0 +1,105 @@
+// Genie Conversations API client — powers the Ask tab. We render the returned SQL +
+// tabular result in our own UI (the "API panel" decision), so answers stay on-brand
+// and provably match the dashboards. The parse helpers are pure and unit-tested; the
+// orchestration (start → poll → fetch result) uses global fetch.
+
+import type { AppConfig } from "./config.js";
+import type { GenieAnswer } from "../shared/api.js";
+
+type Json = Record<string, any>;
+
+const POLL_INTERVAL_MS = 1200;
+const POLL_TIMEOUT_MS = 60_000;
+
+// ---- pure parse helpers (tested) ----
+
+export function extractText(message: Json): string {
+  const att = (message.attachments ?? []).find((a: Json) => a?.text?.content);
+  return att?.text?.content ?? message?.content ?? "";
+}
+
+export function extractSql(message: Json): string {
+  const att = (message.attachments ?? []).find((a: Json) => a?.query?.query);
+  return att?.query?.query ?? "";
+}
+
+export function extractQueryAttachmentId(message: Json): string | null {
+  const att = (message.attachments ?? []).find((a: Json) => a?.query);
+  return att?.attachment_id ?? null;
+}
+
+export function parseStatementResult(payload: Json): {
+  columns: string[];
+  rows: (string | number | null)[][];
+} {
+  const sr = payload?.statement_response ?? payload;
+  const columns: string[] = (sr?.manifest?.schema?.columns ?? []).map(
+    (c: Json) => c.name,
+  );
+  const rows: (string | number | null)[][] = (sr?.result?.data_array ?? []).map(
+    (r: any[]) => r.map((v) => (v === null || v === undefined ? null : v)),
+  );
+  return { columns, rows };
+}
+
+// ---- orchestration ----
+
+function headers(cfg: AppConfig): Record<string, string> {
+  return {
+    Authorization: `Bearer ${cfg.token}`,
+    "Content-Type": "application/json",
+  };
+}
+
+function base(cfg: AppConfig): string {
+  return `${cfg.host}/api/2.0/genie/spaces/${cfg.genieSpaceId}`;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export async function askGenie(
+  cfg: AppConfig,
+  question: string,
+): Promise<GenieAnswer> {
+  const startRes = await fetch(`${base(cfg)}/start-conversation`, {
+    method: "POST",
+    headers: headers(cfg),
+    body: JSON.stringify({ content: question }),
+  });
+  if (!startRes.ok) throw new Error(`genie start failed: ${startRes.status}`);
+  const start: Json = await startRes.json();
+  const conversationId = start.conversation_id ?? start.conversation?.id;
+  const messageId = start.message_id ?? start.message?.id;
+
+  const msgUrl = `${base(cfg)}/conversations/${conversationId}/messages/${messageId}`;
+  const deadline = Date.now() + POLL_TIMEOUT_MS;
+  let message: Json = {};
+  for (;;) {
+    const r = await fetch(msgUrl, { headers: headers(cfg) });
+    if (!r.ok) throw new Error(`genie poll failed: ${r.status}`);
+    message = await r.json();
+    const status = message.status;
+    if (status === "COMPLETED" || status === "FAILED") break;
+    if (Date.now() > deadline) throw new Error("genie poll timed out");
+    await sleep(POLL_INTERVAL_MS);
+  }
+
+  let columns: string[] = [];
+  let rows: (string | number | null)[][] = [];
+  const attachmentId = extractQueryAttachmentId(message);
+  if (attachmentId) {
+    const qr = await fetch(
+      `${msgUrl}/attachments/${attachmentId}/query-result`,
+      { headers: headers(cfg) },
+    );
+    if (qr.ok) ({ columns, rows } = parseStatementResult(await qr.json()));
+  }
+
+  return {
+    question,
+    text: extractText(message),
+    sql: extractSql(message),
+    columns,
+    rows,
+  };
+}
