@@ -21,14 +21,14 @@ env:
   - name: DATA_CATALOG
     value: "dev_churn"
 
-  # --- Lakebase (the "do this now" queue). Commented out for the first deploy: with
-  # these unset the queue falls back to the warehouse. Uncomment once the Lakebase
-  # secret + connection are wired (see runbook), and grant the app SP on Postgres. ---
-  # - name: LAKEBASE_HOST
-  #   value: "<instance>.database.cloud.databricks.com"
-  # - name: LAKEBASE_USER
-  #   value: "<app-sp-role>"
-  # - name: LAKEBASE_DATABASE
-  #   value: "databricks_postgres"
-  # - name: LAKEBASE_PASSWORD
-  #   valueFrom: "lakebase-password"
+  # --- Lakebase (the "do this now" queue, Option A). No password/secret: the app SP
+  # mints short-lived OAuth tokens at runtime (@databricks/lakebase), authenticating as
+  # a Postgres role named for its client id. Requires the role+grant in
+  # app/lakebase_grants.sql. With these set, /api/do-now streams from Lakebase; unset,
+  # it falls back to the warehouse. ---
+  - name: LAKEBASE_HOST
+    value: "ep-quiet-heart-d8t4ei2i.database.us-east-2.cloud.databricks.com"
+  - name: LAKEBASE_ENDPOINT
+    value: "projects/dev-churn-serving/branches/production/endpoints/primary"
+  - name: LAKEBASE_DATABASE
+    value: "databricks_postgres"

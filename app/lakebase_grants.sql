@@ -1,15 +1,22 @@
--- Stage 6 — Lakebase Postgres grants for the "do this now" queue (optional path).
+-- Stage 6 — Lakebase Postgres role + grants for the app's service principal.
 --
--- Only needed once you wire the Lakebase env in app.yaml (the app falls back to the
--- warehouse otherwise). Run in the Lakebase Postgres database as the instance owner
--- (psql with an OAuth token — see serving/README.md for the connection pattern). This
--- is the Postgres-side grant that Stage 3 deliberately deferred to Stage 6.
+-- Needed for the "do this now" queue to stream from Lakebase (Option A). Run in the
+-- Lakebase database as the instance owner (psql + OAuth token — see serving/README.md).
+-- This is the Postgres-side grant that Stage 3 deferred to Stage 6.
 --
--- Replace <app_sp_role> with the app SP's Postgres role (its application id).
+-- The app SP's OAuth token authenticates as a Postgres ROLE whose name is the SP's
+-- CLIENT ID. A plain `CREATE ROLE` will NOT accept Databricks OAuth JWTs — the role
+-- must be created with the databricks_auth extension's databricks_create_role().
+--
+-- App SP client id: 1768cda0-b24e-493f-8b2f-16fb8b8eda3a
 
-GRANT USAGE ON SCHEMA public TO "<app_sp_role>";
-GRANT SELECT ON public.churn_serving     TO "<app_sp_role>";
-GRANT SELECT ON public.churn_predictions TO "<app_sp_role>";
+CREATE EXTENSION IF NOT EXISTS databricks_auth;
+SELECT databricks_create_role('1768cda0-b24e-493f-8b2f-16fb8b8eda3a', 'SERVICE_PRINCIPAL');
+
+GRANT CONNECT ON DATABASE databricks_postgres TO "1768cda0-b24e-493f-8b2f-16fb8b8eda3a";
+GRANT USAGE   ON SCHEMA   public              TO "1768cda0-b24e-493f-8b2f-16fb8b8eda3a";
+GRANT SELECT  ON public.churn_serving         TO "1768cda0-b24e-493f-8b2f-16fb8b8eda3a";
+GRANT SELECT  ON public.churn_predictions     TO "1768cda0-b24e-493f-8b2f-16fb8b8eda3a";
 
 -- Verify:
 --   \dp public.churn_serving

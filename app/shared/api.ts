@@ -60,6 +60,11 @@ export interface AtRiskFilters {
   limit?: number;
 }
 
+export interface Health {
+  status: string;
+  doNowSource: "lakebase" | "warehouse";
+}
+
 export interface CodingPoint {
   month: string; // YYYY-MM-DD
   codingHours: number; // avg daily coding hours that month

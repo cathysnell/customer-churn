@@ -5,9 +5,13 @@ export interface LakebaseConfig {
   host: string;
   port: number;
   database: string;
-  user: string;
-  password: string;
-  ssl: boolean;
+  // OAuth token endpoint path (Lakebase mints/refreshes short-lived tokens as the
+  // Postgres password via @databricks/lakebase). Empty only when a static local-dev
+  // password is used instead.
+  endpoint: string;
+  sslMode: "require" | "disable" | "prefer";
+  user?: string; // local-dev only; in Apps the SP identity is auto-resolved
+  password?: string; // local-dev static override; OAuth is used when absent
 }
 
 export interface AppConfig {
@@ -40,16 +44,19 @@ function normalizeHost(raw: string): string {
 
 function loadLakebase(env: Env): LakebaseConfig | null {
   const host = env.LAKEBASE_HOST?.trim();
-  const user = env.LAKEBASE_USER?.trim();
+  const endpoint = env.LAKEBASE_ENDPOINT?.trim();
   const password = env.LAKEBASE_PASSWORD?.trim();
-  if (!host || !user || !password) return null; // incomplete → disabled
+  // Enabled when we can authenticate: OAuth (host + endpoint, the Apps path) or a
+  // static password (host + password, local-dev). Otherwise disabled → warehouse fallback.
+  if (!host || (!endpoint && !password)) return null;
   return {
     host,
     port: Number(env.LAKEBASE_PORT ?? 5432),
     database: env.LAKEBASE_DATABASE?.trim() || "databricks_postgres",
-    user,
-    password,
-    ssl: (env.LAKEBASE_SSL ?? "true").toLowerCase() !== "false",
+    endpoint: endpoint || "",
+    sslMode: (env.LAKEBASE_SSL ?? "true").toLowerCase() === "false" ? "disable" : "require",
+    user: env.LAKEBASE_USER?.trim() || undefined,
+    password: password || undefined,
   };
 }
 

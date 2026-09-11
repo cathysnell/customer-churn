@@ -6,6 +6,7 @@ import type {
   CodingPoint,
   GenieAnswer,
   GeoChurn,
+  Health,
   Kpis,
   OutreachResult,
   TrendPoint,
@@ -41,6 +42,7 @@ export function atRiskUrl(f: AtRiskFilters = {}): string {
 }
 
 export const api = {
+  health: () => getJson<Health>("/api/health"),
   kpis: () => getJson<Kpis>("/api/kpis"),
   trend: () => getJson<TrendPoint[]>("/api/trend"),
   geoChurn: () => getJson<GeoChurn[]>("/api/geo-churn"),

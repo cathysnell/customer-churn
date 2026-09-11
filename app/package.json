@@ -16,6 +16,7 @@
   },
   "//deps": "vite + plugin-react are runtime deps because Databricks Apps installs from package.json (possibly omitting devDependencies) and runs `npm run start`, whose prestart hook builds dist/ in the runtime.",
   "dependencies": {
+    "@databricks/lakebase": "^0.6.0",
     "@databricks/sql": "^1.10.0",
     "@fastify/static": "^8.0.1",
     "@vitejs/plugin-react": "^4.3.4",

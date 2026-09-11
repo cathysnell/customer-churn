@@ -62,16 +62,22 @@ databricks api patch /api/2.0/permissions/genie/01f1ad360e121f099e3070de938cd8cb
   --json '{"access_control_list":[{"service_principal_name":"<app_sp>","permission_level":"CAN_RUN"}]}'
 ```
 
-## 4. (Optional) Lakebase for the "do this now" queue
+## 4. Lakebase for the "do this now" queue (Option A — done live 2026-09-11)
 
-The queue works via the warehouse fallback with no extra setup. To feature the Stage-3
-serving layer instead:
+The queue streams from Lakebase (falls back to the warehouse if unconfigured).
+**No secret** — the app SP mints short-lived OAuth tokens at runtime via
+`@databricks/lakebase`. Setup:
 
-1. Create secret scope + key: `databricks secrets create-scope retention-cockpit`;
-   put the Lakebase role password at key `lakebase-password`.
-2. Uncomment the `lakebase-password` secret resource in `databricks.yml` and the
-   `LAKEBASE_*` env in `app/app.yaml` (fill host/user), then re-`deploy`/`run`.
-3. Apply [`../app/lakebase_grants.sql`](../app/lakebase_grants.sql) in Postgres.
+1. **Postgres role + grant** — apply [`../app/lakebase_grants.sql`](../app/lakebase_grants.sql)
+   as the instance owner (psql/psycopg + `generate-database-credential` token). It uses
+   `databricks_create_role('<sp-client-id>','SERVICE_PRINCIPAL')` (a plain `CREATE ROLE`
+   won't accept Databricks OAuth JWTs) + `GRANT SELECT` on the two tables.
+2. **app.yaml** — set `LAKEBASE_HOST` + `LAKEBASE_ENDPOINT` (+ `LAKEBASE_DATABASE`).
+   Endpoint from `databricks postgres list-endpoints projects/dev-churn-serving/branches/production`.
+   No `LAKEBASE_PASSWORD` / secret resource.
+3. `deploy` + `run`, then confirm `/api/health` → `"doNowSource":"lakebase"`.
+
+Evidence: [`../evidence/app-lakebase-donow.md`](../evidence/app-lakebase-donow.md).
 
 ## 5. Verify + capture evidence (text-readable)
 
