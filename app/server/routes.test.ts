@@ -27,6 +27,7 @@ function mockDeps(over: Partial<DataApi> = {}): DataApi {
     getGeoChurn: vi.fn(async () => [{ geo: "LATAM", churnRatePct: 3.99 }]),
     getAtRisk: vi.fn(async () => [sampleUser]),
     getDoNow: vi.fn(async () => [sampleUser]),
+    getDoNowCount: vi.fn(async () => 1004),
     getUser: vi.fn(async () => ({ ...sampleUser, avgAcceptanceRate: 0.24, avgSessionFrequency: 2.1, supportTickets: 3, tenureMonths: 14, isCurrentlySubscribed: true }) as UserDetail),
     getCodingHistory: vi.fn(async () => [
       { month: "2026-03-01", codingHours: 6.43 },
@@ -84,6 +85,13 @@ describe("routes", () => {
     const app = await makeApp(mockDeps({ getUser: vi.fn(async () => null) }));
     expect((await app.inject({ method: "GET", url: "/api/user/bad'id" })).statusCode).toBe(400);
     expect((await app.inject({ method: "GET", url: "/api/user/usr_x" })).statusCode).toBe(404);
+  });
+
+  it("GET /api/do-now/count returns the uncapped cohort size", async () => {
+    const app = await makeApp(deps);
+    const res = await app.inject({ method: "GET", url: "/api/do-now/count" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ count: 1004 });
   });
 
   it("GET /api/user/:id/coding-history returns the monthly series (default 3)", async () => {

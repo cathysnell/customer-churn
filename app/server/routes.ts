@@ -57,6 +57,8 @@ export function buildRoutes(deps: DataApi): FastifyPluginAsync {
       return deps.getDoNow(limit);
     });
 
+    app.get("/api/do-now/count", async () => ({ count: await deps.getDoNowCount() }));
+
     app.get<{ Params: { id: string } }>("/api/user/:id", async (req, reply) => {
       const { id } = req.params;
       if (!isValidUserId(id)) return reply.code(400).send({ error: "invalid user id" });

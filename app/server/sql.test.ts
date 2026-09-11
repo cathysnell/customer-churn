@@ -3,6 +3,7 @@ import {
   atRiskSql,
   buildKpis,
   codingHistorySql,
+  doNowCountSql,
   isValidUserId,
   latestChurnPct,
   mapAtRisk,
@@ -55,6 +56,16 @@ describe("query builders", () => {
     expect(() => userDetailSql("dev_churn", "a' OR '1'='1")).toThrow();
     expect(userDetailSql("dev_churn", "usr_1")).toContain("p.user_id = 'usr_1'");
   });
+  it("doNowCountSql counts the cohort, uncapped, on the gold tables", () => {
+    const sql = doNowCountSql("dev_churn");
+    expect(sql).toContain("SELECT COUNT(*)");
+    expect(sql).toContain("dev_churn.gold.churn_predictions");
+    expect(sql).toContain("p.churn_risk_band = 'high'");
+    expect(sql).toContain("s.is_currently_subscribed = TRUE");
+    expect(sql).toContain("s.crm_touches_30d = 0");
+    expect(sql).not.toContain("LIMIT");
+  });
+
   it("codingHistorySql validates id, clamps months, hits churn_labels", () => {
     expect(() => codingHistorySql("dev_churn", "bad'id", 3)).toThrow();
     const sql = codingHistorySql("dev_churn", "USR-1", 3);

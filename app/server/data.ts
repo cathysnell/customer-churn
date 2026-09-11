@@ -21,9 +21,11 @@ import {
   atRiskSql,
   buildKpis,
   codingHistorySql,
+  doNowCountSql,
   geoChurnSql,
   latestChurnPct,
   latestChurnSql,
+  num,
   mapAtRisk,
   mapCodingHistory,
   mapGeo,
@@ -41,6 +43,7 @@ export interface DataApi {
   getGeoChurn(): Promise<GeoChurn[]>;
   getAtRisk(filters: AtRiskFilters): Promise<AtRiskUser[]>;
   getDoNow(limit: number): Promise<AtRiskUser[]>;
+  getDoNowCount(): Promise<number>;
   getUser(id: string): Promise<UserDetail | null>;
   getCodingHistory(id: string, months: number): Promise<CodingPoint[]>;
   ask(question: string): Promise<GenieAnswer>;
@@ -75,6 +78,12 @@ export function createDataApi(cfg: AppConfig): DataApi {
       return mapAtRisk(
         await wh(atRiskSql(cat, { band: "high", noCrm: true, limit })),
       );
+    },
+    async getDoNowCount() {
+      // Uncapped COUNT from the governed warehouse — the banner's true cohort size,
+      // independent of the (capped) row list above.
+      const rows = await wh(doNowCountSql(cat));
+      return Math.round(num(rows[0]?.n));
     },
     async getUser(id) {
       const rows = await wh(userDetailSql(cat, id));
