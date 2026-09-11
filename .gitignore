@@ -24,6 +24,9 @@
 .databrickscfg
 **/secrets*
 
+# Databricks Asset Bundle state
+.databricks/
+
 # Python
 __pycache__/
 *.pyc

@@ -43,17 +43,25 @@ npm run typecheck             # tsc --noEmit
 
 ## Deploy (Databricks Apps)
 
-`app.yaml` pins the warehouse id + Genie space; `DATABRICKS_HOST` and the OAuth token
-are injected by the runtime. `npm run build` emits `dist/`, which the Fastify process
-(`npm run start`) serves alongside `/api`.
+Full steps: [`../docs/app-deploy-runbook.md`](../docs/app-deploy-runbook.md). In short,
+the repo-root Asset Bundle ([`../databricks.yml`](../databricks.yml)) deploys `app/`:
+
+```bash
+databricks bundle deploy   -t dev -p fevm-serverless-stable-yuzk83   # create app + SP
+databricks bundle run cockpit -t dev -p fevm-serverless-stable-yuzk83 # install + build + start
+```
+
+The Apps runtime installs from `package.json` and runs `npm run start`; its `prestart`
+hook runs `vite build` so `dist/` is produced in the runtime and served by Fastify
+alongside `/api`. `DATABRICKS_HOST` + the SP OAuth token are injected by the runtime.
 
 **Grants the app SP needs** (least-privilege, per-stage model):
-- Warehouse `128c306447d9ef00`: `CAN USE`
-- UC: `SELECT` on `dev_churn.gold.churn_serving`, `.churn_predictions`,
-  `dev_churn.silver.churn_labels`; `EXECUTE` on `dev_churn.gold.at_risk_users`,
-  `.untouched_at_risk_users`
-- Lakebase: `GRANT SELECT ON public.churn_serving, public.churn_predictions TO <app_sp_role>`
-- Genie space `01f1ad360e121f099e3070de938cd8cb`: `CAN RUN`
+- Warehouse `128c306447d9ef00`: `CAN_USE` — **auto-granted** by the bundle's
+  `sql_warehouse` app resource.
+- UC: `SELECT` on the tables + metric views, `EXECUTE` on the functions —
+  [`grants.sql`](grants.sql) (run after the app SP exists).
+- Genie space `01f1ad360e121f099e3070de938cd8cb`: `CAN RUN`.
+- Lakebase (optional, do-now queue): [`lakebase_grants.sql`](lakebase_grants.sql).
 
 ## Evidence
 
