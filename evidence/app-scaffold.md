@@ -61,3 +61,23 @@ connect with locally (`Invalid URL: https://:443/`); in Databricks Apps the runt
 injects `DATABRICKS_HOST` + the SP OAuth token and the warehouse read resolves. The
 `doNowSource: "warehouse"` confirms the Lakebase-vs-warehouse fallback wiring: with no
 `LAKEBASE_*` env the do-now queue falls back to the warehouse.
+
+## Deploy config validated — `databricks bundle validate` (2026-09-11)
+
+The Asset Bundle ([`../databricks.yml`](../databricks.yml)) validated against the live
+`fevm-serverless-stable-yuzk83` workspace (Databricks CLI v1.2.0):
+
+```
+Name: retention-cockpit
+Target: dev
+Workspace:
+  User: cathy.snell@databricks.com
+  Path: /Workspace/Users/cathy.snell@databricks.com/.bundle/retention-cockpit/dev
+
+Validation OK!
+```
+
+Confirms the app resource, `sql_warehouse` resource, `sync.exclude`, and targets are
+structurally correct. The actual `databricks bundle deploy` (creates the app + its
+service principal — a workspace write) is gated on explicit approval; steps in
+[`app-deploy-runbook.md`](app-deploy-runbook.md).

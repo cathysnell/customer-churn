@@ -1,25 +1,34 @@
 # Databricks App manifest — Retention Cockpit (Stage 6).
 #
 # The app runs as its service principal. DATABRICKS_HOST and the OAuth token are
-# injected by the Apps runtime; the warehouse id and Genie space are pinned here so
-# the app reads the SAME governed semantic layer as Genie. Lakebase connection vars
-# (for the "do this now" queue) are supplied as app resources / secrets — see README.
+# injected by the Apps runtime. `valueFrom` binds to app resources declared in the
+# bundle (../databricks.yml) — declaring a resource with a permission auto-grants that
+# permission to the app SP at deploy (warehouse CAN_USE, secret CAN_READ). UC SELECT/
+# EXECUTE and the Lakebase Postgres grant are NOT auto-granted — see app/grants.sql
+# and docs/app-deploy-runbook.md.
 #
-# Grants the app SP needs (least-privilege, per-stage governance model):
-#   - SQL warehouse 128c306447d9ef00: CAN USE
-#   - UC: SELECT on dev_churn.gold.churn_serving, .churn_predictions,
-#         dev_churn.silver.churn_labels; EXECUTE on dev_churn.gold.at_risk_users,
-#         .untouched_at_risk_users
-#   - Lakebase Postgres: GRANT SELECT ON public.churn_serving, public.churn_predictions
-#         TO <app_sp_role>   (the grant Stage 3 deferred to here)
-#   - Genie space 01f1ad360e121f099e3070de938cd8cb: CAN RUN
+# The runtime installs from package.json and runs `npm run start`; its `prestart` hook
+# builds dist/ in the runtime. The server reads DATABRICKS_APP_PORT and binds 0.0.0.0.
 
 command: ["npm", "run", "start"]
 
 env:
+  # Warehouse id comes from the bundle's sql_warehouse resource (CAN_USE auto-granted).
   - name: DATABRICKS_WAREHOUSE_ID
-    value: "128c306447d9ef00"
+    valueFrom: "sql-warehouse"
   - name: GENIE_SPACE_ID
     value: "01f1ad360e121f099e3070de938cd8cb"
   - name: DATA_CATALOG
     value: "dev_churn"
+
+  # --- Lakebase (the "do this now" queue). Commented out for the first deploy: with
+  # these unset the queue falls back to the warehouse. Uncomment once the Lakebase
+  # secret + connection are wired (see runbook), and grant the app SP on Postgres. ---
+  # - name: LAKEBASE_HOST
+  #   value: "<instance>.database.cloud.databricks.com"
+  # - name: LAKEBASE_USER
+  #   value: "<app-sp-role>"
+  # - name: LAKEBASE_DATABASE
+  #   value: "databricks_postgres"
+  # - name: LAKEBASE_PASSWORD
+  #   valueFrom: "lakebase-password"

@@ -12,13 +12,22 @@ export interface LakebaseConfig {
 
 export interface AppConfig {
   host: string; // https://<workspace>
-  token: string;
+  token: string; // PAT for local dev
+  clientId: string; // OAuth M2M (injected by Databricks Apps)
+  clientSecret: string;
   warehouseId: string;
   warehouseHttpPath: string;
   genieSpaceId: string;
   catalog: string;
   port: number;
   lakebase: LakebaseConfig | null; // null → do-now queue falls back to the warehouse
+}
+
+/** How the app authenticates to the workspace. PAT locally; OAuth M2M in Apps. */
+export function authMode(cfg: AppConfig): "pat" | "oauth-m2m" | "none" {
+  if (cfg.token) return "pat";
+  if (cfg.clientId && cfg.clientSecret) return "oauth-m2m";
+  return "none";
 }
 
 type Env = Record<string, string | undefined>;
@@ -52,6 +61,8 @@ export function loadConfig(env: Env): AppConfig {
   return {
     host,
     token: env.DATABRICKS_TOKEN ?? "",
+    clientId: env.DATABRICKS_CLIENT_ID ?? "",
+    clientSecret: env.DATABRICKS_CLIENT_SECRET ?? "",
     warehouseId,
     warehouseHttpPath: warehouseId ? `/sql/1.0/warehouses/${warehouseId}` : "",
     genieSpaceId: (env.GENIE_SPACE_ID ?? "").trim(),
@@ -65,7 +76,8 @@ export function loadConfig(env: Env): AppConfig {
 export function missingWarehouseConfig(cfg: AppConfig): string[] {
   const missing: string[] = [];
   if (!cfg.host) missing.push("DATABRICKS_HOST");
-  if (!cfg.token) missing.push("DATABRICKS_TOKEN");
   if (!cfg.warehouseId) missing.push("DATABRICKS_WAREHOUSE_ID");
+  if (authMode(cfg) === "none")
+    missing.push("DATABRICKS_TOKEN or DATABRICKS_CLIENT_ID+DATABRICKS_CLIENT_SECRET");
   return missing;
 }

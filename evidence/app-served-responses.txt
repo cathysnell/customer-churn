@@ -1,0 +1,185 @@
+# Stage 6 — Retention Cockpit: live served responses
+# App: https://retention-cockpit-7474660065596768.aws.databricksapps.com  (service principal 1768cda0-b24e-493f-8b2f-16fb8b8eda3a)
+# Warehouse 128c306447d9ef00 · Genie space 01f1ad360e121f099e3070de938cd8cb · captured 2026-09-11
+# Auth: OAuth M2M (app SP). Numbers match evidence/genie-space.md (churn 3.25%, MRR high $36,568).
+
+## GET /api/health
+{
+    "status": "ok",
+    "doNowSource": "warehouse"
+}
+
+## GET /api/kpis
+{
+    "churnRatePct": 3.25,
+    "churnTargetPct": 4,
+    "churnBaselinePct": 4.7,
+    "mrrAtRiskTotal": 541488,
+    "mrrAtRiskByBand": [
+        {
+            "band": "low",
+            "mrr": 446184
+        },
+        {
+            "band": "medium",
+            "mrr": 58736
+        },
+        {
+            "band": "high",
+            "mrr": 36568
+        }
+    ],
+    "reactivationPct": 9.8,
+    "reactivationBaselinePct": 8,
+    "projectedAnnualImpact": 2580000,
+    "illustrative": [
+        "churnBaselinePct",
+        "reactivationPct",
+        "reactivationBaselinePct",
+        "projectedAnnualImpact"
+    ]
+}
+
+## GET /api/trend  (first 3 + last of 18 months)
+[
+  {
+    "month": "Sat Mar 01",
+    "churnRatePct": 5.56
+  },
+  {
+    "month": "Tue Apr 01",
+    "churnRatePct": 5.72
+  },
+  {
+    "month": "Thu May 01",
+    "churnRatePct": 5.7
+  },
+  "...",
+  {
+    "month": "Sat Aug 01",
+    "churnRatePct": 3.25
+  }
+]
+
+## GET /api/geo-churn
+[
+    {
+        "geo": "LATAM",
+        "churnRatePct": 3.99
+    },
+    {
+        "geo": "MEA",
+        "churnRatePct": 3.6
+    },
+    {
+        "geo": "APAC",
+        "churnRatePct": 3.23
+    },
+    {
+        "geo": "NA",
+        "churnRatePct": 3.22
+    },
+    {
+        "geo": "EMEA",
+        "churnRatePct": 3.12
+    },
+    {
+        "geo": "ANZ",
+        "churnRatePct": 3.06
+    }
+]
+
+## GET /api/at-risk?band=high&noCrm=true&limit=3
+[
+    {
+        "userId": "USR-00045647",
+        "geo": "NA",
+        "persona": "freelancer",
+        "plan": "pro_team_monthly",
+        "mrr": 20,
+        "score": 0.999,
+        "band": "high",
+        "codingTrend": 0.88,
+        "crmTouches": 0
+    },
+    {
+        "userId": "USR-00049270",
+        "geo": "NA",
+        "persona": "freelancer",
+        "plan": "pro_annual",
+        "mrr": 16,
+        "score": 0.999,
+        "band": "high",
+        "codingTrend": 1.78,
+        "crmTouches": 0
+    },
+    {
+        "userId": "USR-00007258",
+        "geo": "ANZ",
+        "persona": "freelancer",
+        "plan": "pro_monthly",
+        "mrr": 20,
+        "score": 0.999,
+        "band": "high",
+        "codingTrend": 2.33,
+        "crmTouches": 0
+    }
+]
+
+## GET /api/do-now  (row count of the untouched-high-risk cohort)
+rows: 500
+{
+  "userId": "USR-00045647",
+  "geo": "NA",
+  "persona": "freelancer",
+  "plan": "pro_team_monthly",
+  "mrr": 20,
+  "score": 0.999,
+  "band": "high",
+  "codingTrend": 0.88,
+  "crmTouches": 0
+}
+
+## GET /api/user/USR-00045647
+{
+    "userId": "USR-00045647",
+    "geo": "NA",
+    "persona": "freelancer",
+    "plan": "pro_team_monthly",
+    "mrr": 20,
+    "score": 0.999,
+    "band": "high",
+    "codingTrend": 0.88,
+    "crmTouches": 0,
+    "avgAcceptanceRate": 0.248,
+    "avgSessionFrequency": 5,
+    "supportTickets": 0,
+    "tenureMonths": 32,
+    "isCurrentlySubscribed": true
+}
+
+## POST /api/genie/query {question: What is this month's Pro churn?}
+{
+    "question": "What is this month's Pro churn?",
+    "text": "This month\u2019s Pro churn rate is **0.032478695000182876**. Based on the latest month in `churn_metrics_monthly`, that is the current monthly churn measure for Pro subscribers.",
+    "sql": "SELECT MEASURE(`Churn rate`) AS `churn_rate`\nFROM `dev_churn`.`gold`.`churn_metrics_monthly`\nWHERE `Month` = (SELECT MAX(`Month`) FROM `dev_churn`.`gold`.`churn_metrics_monthly`)\nGROUP BY ALL;",
+    "columns": [
+        "churn_rate"
+    ],
+    "rows": [
+        [
+            "0.032478695000182876"
+        ]
+    ]
+}
+
+## POST /api/outreach {userId: USR-00045647}  (simulated, no external send)
+{
+    "logged": true,
+    "userId": "USR-00045647",
+    "simulated": true
+}
+
+## GET /  (built SPA served by Fastify)
+<title>Retention Cockpit</title>
+src="/assets/index-Dq13_XlG.js"

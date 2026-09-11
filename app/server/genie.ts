@@ -44,11 +44,30 @@ export function parseStatementResult(payload: Json): {
 
 // ---- orchestration ----
 
-function headers(cfg: AppConfig): Record<string, string> {
-  return {
-    Authorization: `Bearer ${cfg.token}`,
-    "Content-Type": "application/json",
-  };
+let tokenCache: { token: string; exp: number } | null = null;
+
+/** Bearer for the Genie REST calls: the PAT locally, or an OAuth M2M token minted
+ *  from the app SP's client id/secret (cached until shortly before expiry). */
+export async function getBearer(cfg: AppConfig): Promise<string> {
+  if (cfg.token) return cfg.token;
+  if (tokenCache && tokenCache.exp > Date.now() + 30_000) return tokenCache.token;
+  const res = await fetch(`${cfg.host}/oidc/v1/token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization:
+        "Basic " + Buffer.from(`${cfg.clientId}:${cfg.clientSecret}`).toString("base64"),
+    },
+    body: new URLSearchParams({ grant_type: "client_credentials", scope: "all-apis" }),
+  });
+  if (!res.ok) throw new Error(`oauth token failed: ${res.status}`);
+  const j: Json = await res.json();
+  tokenCache = { token: j.access_token, exp: Date.now() + (j.expires_in ?? 3600) * 1000 };
+  return tokenCache.token;
+}
+
+function headers(token: string): Record<string, string> {
+  return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 }
 
 function base(cfg: AppConfig): string {
@@ -61,9 +80,10 @@ export async function askGenie(
   cfg: AppConfig,
   question: string,
 ): Promise<GenieAnswer> {
+  const h = headers(await getBearer(cfg));
   const startRes = await fetch(`${base(cfg)}/start-conversation`, {
     method: "POST",
-    headers: headers(cfg),
+    headers: h,
     body: JSON.stringify({ content: question }),
   });
   if (!startRes.ok) throw new Error(`genie start failed: ${startRes.status}`);
@@ -75,7 +95,7 @@ export async function askGenie(
   const deadline = Date.now() + POLL_TIMEOUT_MS;
   let message: Json = {};
   for (;;) {
-    const r = await fetch(msgUrl, { headers: headers(cfg) });
+    const r = await fetch(msgUrl, { headers: h });
     if (!r.ok) throw new Error(`genie poll failed: ${r.status}`);
     message = await r.json();
     const status = message.status;
@@ -88,10 +108,9 @@ export async function askGenie(
   let rows: (string | number | null)[][] = [];
   const attachmentId = extractQueryAttachmentId(message);
   if (attachmentId) {
-    const qr = await fetch(
-      `${msgUrl}/attachments/${attachmentId}/query-result`,
-      { headers: headers(cfg) },
-    );
+    const qr = await fetch(`${msgUrl}/attachments/${attachmentId}/query-result`, {
+      headers: h,
+    });
     if (qr.ok) ({ columns, rows } = parseStatementResult(await qr.json()));
   }
 

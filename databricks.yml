@@ -1,0 +1,58 @@
+# Databricks Asset Bundle — Stage 6 Retention Cockpit app.
+#
+# Deploys app/ as a Databricks App. Declaring the warehouse as an app resource with a
+# permission auto-grants the app's service principal CAN_USE at deploy. UC SELECT/
+# EXECUTE and the Lakebase Postgres grant are applied separately (app/grants.sql +
+# docs/app-deploy-runbook.md). Requires Databricks CLI >= v0.239.0 (source_code_path).
+#
+# Deploy (see the runbook for the full flow):
+#   databricks bundle validate  -t dev -p fevm-serverless-stable-yuzk83
+#   databricks bundle deploy    -t dev -p fevm-serverless-stable-yuzk83
+#   databricks bundle run cockpit -t dev -p fevm-serverless-stable-yuzk83
+
+bundle:
+  name: retention-cockpit
+
+variables:
+  warehouse_id:
+    description: SQL warehouse the app queries (same as the metric views / Genie).
+    default: "128c306447d9ef00"
+
+# Keep local build artifacts out of the workspace upload.
+# NOTE: package-lock.json is excluded on purpose — the Databricks Apps npm proxy 404s
+# on some lockfile-pinned tarball URLs (e.g. yallist-3.1.1.tgz), so the runtime must
+# resolve packages by name against the proxy rather than by the lockfile's pinned URLs.
+sync:
+  exclude:
+    - "app/node_modules"
+    - "app/dist"
+    - "app/package-lock.json"
+
+resources:
+  apps:
+    cockpit:
+      name: "retention-cockpit"
+      description: "Stage 6 — Retention Cockpit: churn KPIs, at-risk worklist, and Genie."
+      source_code_path: ./app
+      resources:
+        - name: "sql-warehouse"
+          sql_warehouse:
+            id: ${var.warehouse_id}
+            permission: "CAN_USE"
+        # Uncomment once the Lakebase secret exists (for the do-now queue):
+        # - name: "lakebase-password"
+        #   secret:
+        #     scope: "retention-cockpit"
+        #     key: "lakebase-password"
+        #     permission: "CAN_READ"
+
+targets:
+  dev:
+    mode: development
+    default: true
+    # host resolved from the CLI profile (-p fevm-serverless-stable-yuzk83);
+    # set explicitly here if not using a profile:
+    # workspace:
+    #   host: https://<workspace>.cloud.databricks.com
+  prod:
+    mode: production

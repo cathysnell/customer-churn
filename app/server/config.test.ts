@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadConfig, missingWarehouseConfig } from "./config.js";
+import { authMode, loadConfig, missingWarehouseConfig } from "./config.js";
 
 describe("loadConfig", () => {
   it("normalizes the host and derives the warehouse http path", () => {
@@ -37,17 +37,31 @@ describe("loadConfig", () => {
   it("reports missing warehouse config", () => {
     expect(missingWarehouseConfig(loadConfig({}))).toEqual([
       "DATABRICKS_HOST",
-      "DATABRICKS_TOKEN",
       "DATABRICKS_WAREHOUSE_ID",
+      "DATABRICKS_TOKEN or DATABRICKS_CLIENT_ID+DATABRICKS_CLIENT_SECRET",
     ]);
+    // PAT satisfies auth
+    expect(
+      missingWarehouseConfig(
+        loadConfig({ DATABRICKS_HOST: "h", DATABRICKS_TOKEN: "t", DATABRICKS_WAREHOUSE_ID: "w" }),
+      ),
+    ).toEqual([]);
+    // OAuth M2M client creds also satisfy auth
     expect(
       missingWarehouseConfig(
         loadConfig({
           DATABRICKS_HOST: "h",
-          DATABRICKS_TOKEN: "t",
+          DATABRICKS_CLIENT_ID: "cid",
+          DATABRICKS_CLIENT_SECRET: "sec",
           DATABRICKS_WAREHOUSE_ID: "w",
         }),
       ),
     ).toEqual([]);
+  });
+
+  it("authMode: PAT wins, else client creds, else none", () => {
+    expect(authMode(loadConfig({ DATABRICKS_TOKEN: "t" }))).toBe("pat");
+    expect(authMode(loadConfig({ DATABRICKS_CLIENT_ID: "c", DATABRICKS_CLIENT_SECRET: "s" }))).toBe("oauth-m2m");
+    expect(authMode(loadConfig({}))).toBe("none");
   });
 });
