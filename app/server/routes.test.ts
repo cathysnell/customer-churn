@@ -35,6 +35,7 @@ function mockDeps(over: Partial<DataApi> = {}): DataApi {
       { month: "2026-05-01", codingHours: 10.18 },
     ]),
     ask: vi.fn(async (q: string): Promise<GenieAnswer> => ({ question: q, text: "answer", sql: "SELECT 1", columns: ["a"], rows: [[1]] })),
+    getSoWhat: vi.fn(async () => ({ body: "Risk is concentrated.", generatedAt: "2026-09-12T00:00:00.000Z", source: "genie" as const })),
     outreach: vi.fn((userId: string) => ({ logged: true as const, userId, simulated: true as const })),
     doNowSource: vi.fn(() => "lakebase" as const),
     ...over,
@@ -106,6 +107,13 @@ describe("routes", () => {
     const app = await makeApp(deps);
     const res = await app.inject({ method: "GET", url: "/api/user/bad'id/coding-history" });
     expect(res.statusCode).toBe(400);
+  });
+
+  it("GET /api/overview/so-what returns the cached narrative DTO", async () => {
+    const app = await makeApp(deps);
+    const res = await app.inject({ method: "GET", url: "/api/overview/so-what" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ body: "Risk is concentrated.", generatedAt: "2026-09-12T00:00:00.000Z", source: "genie" });
   });
 
   it("POST /api/genie/query requires a question", async () => {

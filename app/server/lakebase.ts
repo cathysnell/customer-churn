@@ -48,6 +48,53 @@ export async function queryDoNow(cfg: LakebaseConfig, limit: number): Promise<Ro
   return res.rows as Row[];
 }
 
+// ---- narrative cache (Lakebase = system of record for the app's own cached text) ----
+//
+// Table (created out-of-band, see serving/app_narrative.sql):
+//   public.app_narrative(cache_key TEXT PRIMARY KEY, body TEXT NOT NULL,
+//                        generated_at TIMESTAMPTZ NOT NULL, source TEXT NOT NULL)
+// The app SP needs SELECT/INSERT/UPDATE. Until the table exists these queries throw
+// and the data layer falls back to the templated narrative.
+
+export interface NarrativeRow {
+  body: string;
+  generatedAt: string; // ISO8601
+  source: string;
+}
+
+export const READ_NARRATIVE_SQL =
+  "SELECT body, generated_at, source FROM public.app_narrative WHERE cache_key = $1";
+
+export const UPSERT_NARRATIVE_SQL =
+  "INSERT INTO public.app_narrative (cache_key, body, generated_at, source) " +
+  "VALUES ($1, $2, now(), $3) " +
+  "ON CONFLICT (cache_key) DO UPDATE SET " +
+  "body = EXCLUDED.body, generated_at = EXCLUDED.generated_at, source = EXCLUDED.source";
+
+export async function readNarrative(
+  cfg: LakebaseConfig,
+  cacheKey: string,
+): Promise<NarrativeRow | null> {
+  const res = await getPool(cfg).query(READ_NARRATIVE_SQL, [cacheKey]);
+  const row = res.rows[0] as Record<string, unknown> | undefined;
+  if (!row) return null;
+  const ts = row.generated_at;
+  return {
+    body: String(row.body ?? ""),
+    generatedAt: ts instanceof Date ? ts.toISOString() : String(ts ?? ""),
+    source: String(row.source ?? ""),
+  };
+}
+
+export async function writeNarrative(
+  cfg: LakebaseConfig,
+  cacheKey: string,
+  body: string,
+  source: string,
+): Promise<void> {
+  await getPool(cfg).query(UPSERT_NARRATIVE_SQL, [cacheKey, body, source]);
+}
+
 export async function closePool(): Promise<void> {
   if (pool) {
     await pool.end();

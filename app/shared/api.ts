@@ -84,5 +84,14 @@ export interface OutreachResult {
   simulated: true; // this build never sends externally
 }
 
+/** Overview "So what?" narrative. The qualitative interpretation is Genie-authored
+ *  and cached weekly in Lakebase; the authoritative figures shown in the box come
+ *  from the governed KPI / geo / do-now endpoints, never from Genie. */
+export interface SoWhat {
+  body: string; // Genie's qualitative narrative, or a templated fallback sentence
+  generatedAt: string; // ISO8601 — when this narrative was generated
+  source: "genie" | "fallback"; // "genie" powers the "⚡ Powered by Genie" pill
+}
+
 export const RISK_BANDS: RiskBand[] = ["high", "medium", "low"];
 export const GEOS = ["NA", "EMEA", "APAC", "LATAM", "MEA", "ANZ"] as const;

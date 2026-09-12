@@ -3,7 +3,7 @@ import { useAsync } from "../hooks/useAsync";
 import { KpiCard } from "../components/KpiCard";
 import { BarList } from "../components/BarList";
 import { TrendChart } from "../components/TrendChart";
-import { moneyShort, pct, geoSeverity } from "../lib/format";
+import { moneyShort, pct, geoSeverity, shortDate } from "../lib/format";
 import type { RiskBand } from "../../shared/api";
 
 const BAND_COLOR: Record<RiskBand, string> = {
@@ -17,6 +17,8 @@ export function Overview({ onGoto }: { onGoto: (v: string) => void }) {
   const kpis = useAsync(() => api.kpis(), []);
   const trend = useAsync(() => api.trend(), []);
   const geo = useAsync(() => api.geoChurn(), []);
+  const doNow = useAsync(() => api.doNowCount(), []);
+  const soWhat = useAsync(() => api.soWhat(), []);
 
   const title = "Are we winning against the 4% churn target?";
   const lede =
@@ -106,8 +108,21 @@ export function Overview({ onGoto }: { onGoto: (v: string) => void }) {
               {topGeo && <>, with <b>{topGeo.geo}</b> churning fastest</>}.
             </p>
             <p className="big" style={{ marginTop: 14 }}>
-              And <span className="hl">1,004</span> high-value subscribers are flagged high-risk with <b>zero CRM outreach</b> — the gap the retention play closes.
+              And <span className="hl">{doNow.data ? doNow.data.count.toLocaleString("en-US") : "…"}</span> high-value subscribers are flagged high-risk with <b>zero CRM outreach</b> — the gap the retention play closes.
             </p>
+            {soWhat.data && (
+              <div className="narrative">
+                <p className="ntxt">{soWhat.data.body}</p>
+                {soWhat.data.source === "genie" && (
+                  <div className="nmeta">
+                    <span className="gpill">⚡ Powered by Genie</span>
+                    {shortDate(soWhat.data.generatedAt) && (
+                      <span className="nstamp">Updated {shortDate(soWhat.data.generatedAt)}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             <button className="jump" onClick={() => onGoto("worklist")}>Open the worklist <span aria-hidden>→</span></button>
           </div>
         </div>
