@@ -42,6 +42,20 @@ export function parseStatementResult(payload: Json): {
   return { columns, rows };
 }
 
+/** Tidy a Genie free-text answer for display in the narrative box: collapse
+ *  whitespace/newlines, strip wrapping quotes, and cap length at a sentence break.
+ *  Pure. */
+export function cleanNarrative(text: string, maxLen = 320): string {
+  let s = (text ?? "").replace(/\s+/g, " ").trim();
+  s = s.replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
+  if (s.length > maxLen) {
+    const cut = s.slice(0, maxLen);
+    const stop = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+    s = stop > maxLen * 0.4 ? cut.slice(0, stop + 1) : cut.trimEnd() + "…";
+  }
+  return s;
+}
+
 // ---- orchestration ----
 
 let tokenCache: { token: string; exp: number } | null = null;

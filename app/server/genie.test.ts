@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  cleanNarrative,
   extractQueryAttachmentId,
   extractSql,
   extractText,
@@ -42,5 +43,27 @@ describe("genie parse helpers", () => {
   });
   it("handles an empty/absent result", () => {
     expect(parseStatementResult({})).toEqual({ columns: [], rows: [] });
+  });
+});
+
+describe("cleanNarrative", () => {
+  it("collapses whitespace and strips wrapping quotes", () => {
+    expect(cleanNarrative('  "Churn is concentrated\n  in the high-risk cohort."  ')).toBe(
+      "Churn is concentrated in the high-risk cohort.",
+    );
+  });
+  it("returns empty string for empty/absent input", () => {
+    expect(cleanNarrative("")).toBe("");
+    expect(cleanNarrative(undefined as unknown as string)).toBe("");
+  });
+  it("truncates at a sentence break under the cap", () => {
+    const long = "First sentence is complete. " + "x".repeat(400);
+    const out = cleanNarrative(long, 60);
+    expect(out).toBe("First sentence is complete.");
+  });
+  it("hard-truncates with an ellipsis when there is no early sentence break", () => {
+    const out = cleanNarrative("y".repeat(400), 50);
+    expect(out.endsWith("…")).toBe(true);
+    expect(out.length).toBeLessThanOrEqual(51);
   });
 });

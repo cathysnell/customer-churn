@@ -10,13 +10,20 @@ import type {
   GeoChurn,
   Kpis,
   OutreachResult,
+  SoWhat,
   TrendPoint,
   UserDetail,
 } from "../shared/api.js";
-import type { AppConfig } from "./config.js";
+import type { AppConfig, LakebaseConfig } from "./config.js";
+import {
+  NARRATIVE_TTL_MS,
+  SO_WHAT_CACHE_KEY,
+  SO_WHAT_FALLBACK,
+  SO_WHAT_PROMPT,
+} from "./constants.js";
 import { queryWarehouse } from "./databricks.js";
-import { queryDoNow } from "./lakebase.js";
-import { askGenie } from "./genie.js";
+import { queryDoNow, readNarrative, writeNarrative } from "./lakebase.js";
+import { askGenie, cleanNarrative } from "./genie.js";
 import {
   activeSubscribersSql,
   atRiskSql,
@@ -48,6 +55,7 @@ export interface DataApi {
   getUser(id: string): Promise<UserDetail | null>;
   getCodingHistory(id: string, months: number): Promise<CodingPoint[]>;
   ask(question: string): Promise<GenieAnswer>;
+  getSoWhat(): Promise<SoWhat>;
   outreach(userId: string): OutreachResult;
   doNowSource(): "lakebase" | "warehouse";
 }
@@ -55,6 +63,32 @@ export interface DataApi {
 export function createDataApi(cfg: AppConfig): DataApi {
   const cat = cfg.catalog;
   const wh = (sql: string) => queryWarehouse(cfg, sql);
+
+  const fallbackNarrative = (): SoWhat => ({
+    body: SO_WHAT_FALLBACK,
+    generatedAt: new Date().toISOString(),
+    source: "fallback",
+  });
+
+  // Ask Genie for a fresh qualitative narrative, tidy it, and cache it in Lakebase.
+  // On any Genie failure, cache the templated fallback so we don't re-hit Genie on
+  // every page load (the box refreshes on the next weekly window or redeploy).
+  async function refreshNarrative(lb: LakebaseConfig): Promise<SoWhat> {
+    try {
+      const ans = await askGenie(cfg, SO_WHAT_PROMPT);
+      const body = cleanNarrative(ans.text);
+      if (!body) throw new Error("empty genie narrative");
+      await writeNarrative(lb, SO_WHAT_CACHE_KEY, body, "genie");
+      return { body, generatedAt: new Date().toISOString(), source: "genie" };
+    } catch {
+      try {
+        await writeNarrative(lb, SO_WHAT_CACHE_KEY, SO_WHAT_FALLBACK, "fallback");
+      } catch {
+        /* cache write best-effort */
+      }
+      return fallbackNarrative();
+    }
+  }
 
   return {
     async getKpis() {
@@ -96,6 +130,36 @@ export function createDataApi(cfg: AppConfig): DataApi {
     },
     async ask(question) {
       return askGenie(cfg, question);
+    },
+    async getSoWhat() {
+      // No Lakebase wired → serve the templated fallback (fast, no pill, no cache).
+      if (!cfg.lakebase) return fallbackNarrative();
+      const lb = cfg.lakebase;
+
+      let cached;
+      try {
+        cached = await readNarrative(lb, SO_WHAT_CACHE_KEY);
+      } catch {
+        // Cache table missing / read failed — degrade to fallback without caching.
+        return fallbackNarrative();
+      }
+
+      const toDto = (r: NonNullable<typeof cached>): SoWhat => ({
+        body: r.body,
+        generatedAt: r.generatedAt,
+        source: r.source === "genie" ? "genie" : "fallback",
+      });
+      const fresh =
+        cached != null && Date.now() - Date.parse(cached.generatedAt) < NARRATIVE_TTL_MS;
+
+      if (cached && fresh) return toDto(cached);
+      if (cached) {
+        // Stale-while-revalidate: return the stale copy now, refresh in the background.
+        void refreshNarrative(lb).catch(() => {});
+        return toDto(cached);
+      }
+      // Nothing cached yet — generate synchronously on this first load.
+      return refreshNarrative(lb);
     },
     outreach(userId) {
       // This build never sends externally — the action is logged in-memory only.

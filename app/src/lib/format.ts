@@ -48,3 +48,11 @@ export function geoSeverity(churnPct: number): RiskBand {
   if (churnPct >= 3.3) return "medium";
   return "low";
 }
+
+/** Short "Mon D" stamp for a narrative refresh date. Returns "" on an unparseable
+ *  input so callers can hide the stamp rather than render "Invalid Date". */
+export function shortDate(iso: string): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "";
+  return new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}

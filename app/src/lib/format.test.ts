@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { geoSeverity, money, moneyShort, pct, trendArrow, trendClass, trendLabel } from "./format";
+import { geoSeverity, money, moneyShort, pct, shortDate, trendArrow, trendClass, trendLabel } from "./format";
 import { atRiskUrl } from "./api";
 
 describe("formatters", () => {
@@ -38,6 +38,10 @@ describe("formatters", () => {
     expect(geoSeverity(3.99)).toBe("high");
     expect(geoSeverity(3.48)).toBe("medium");
     expect(geoSeverity(3.06)).toBe("low");
+  });
+  it("shortDate formats an ISO stamp and blanks unparseable input", () => {
+    expect(shortDate("2026-09-12T00:00:00.000Z")).toMatch(/^[A-Z][a-z]{2} \d{1,2}$/);
+    expect(shortDate("not-a-date")).toBe("");
   });
 });
 

@@ -41,6 +41,7 @@ export function buildRoutes(deps: DataApi): FastifyPluginAsync {
     app.get("/api/kpis", async () => deps.getKpis());
     app.get("/api/trend", async () => deps.getTrend());
     app.get("/api/geo-churn", async () => deps.getGeoChurn());
+    app.get("/api/overview/so-what", async () => deps.getSoWhat());
 
     app.get("/api/at-risk", async (req, reply) => {
       try {

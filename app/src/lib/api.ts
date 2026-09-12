@@ -9,6 +9,7 @@ import type {
   Health,
   Kpis,
   OutreachResult,
+  SoWhat,
   TrendPoint,
   UserDetail,
 } from "../../shared/api";
@@ -46,6 +47,7 @@ export const api = {
   kpis: () => getJson<Kpis>("/api/kpis"),
   trend: () => getJson<TrendPoint[]>("/api/trend"),
   geoChurn: () => getJson<GeoChurn[]>("/api/geo-churn"),
+  soWhat: () => getJson<SoWhat>("/api/overview/so-what"),
   atRisk: (f: AtRiskFilters = {}) => getJson<AtRiskUser[]>(atRiskUrl(f)),
   doNow: (limit = 100) => getJson<AtRiskUser[]>(`/api/do-now?limit=${limit}`),
   doNowCount: () => getJson<{ count: number }>("/api/do-now/count"),
