@@ -22,7 +22,14 @@ import {
   SO_WHAT_PROMPT,
 } from "./constants.js";
 import { queryWarehouse } from "./databricks.js";
-import { queryDoNow, readNarrative, writeNarrative } from "./lakebase.js";
+import {
+  logOutreach,
+  queryAtRisk,
+  queryDoNow,
+  queryUserDetail,
+  readNarrative,
+  writeNarrative,
+} from "./lakebase.js";
 import { askGenie, askGenieNarrative, cleanNarrative } from "./genie.js";
 import {
   activeSubscribersSql,
@@ -56,7 +63,7 @@ export interface DataApi {
   getCodingHistory(id: string, months: number): Promise<CodingPoint[]>;
   ask(question: string): Promise<GenieAnswer>;
   getSoWhat(): Promise<SoWhat>;
-  outreach(userId: string): OutreachResult;
+  outreach(userId: string): Promise<OutreachResult>;
   doNowSource(): "lakebase" | "warehouse";
 }
 
@@ -106,11 +113,26 @@ export function createDataApi(cfg: AppConfig): DataApi {
       return mapGeo(await wh(geoChurnSql(cat)));
     },
     async getAtRisk(filters) {
+      // Operational reads are served from Lakebase (the synced serving layer), with
+      // the governed warehouse as a transparent fallback if Lakebase is down/unset.
+      if (cfg.lakebase) {
+        try {
+          return mapAtRisk(await queryAtRisk(cfg.lakebase, filters));
+        } catch (e) {
+          console.error("lakebase at-risk failed, falling back to warehouse:", e);
+        }
+      }
       return mapAtRisk(await wh(atRiskSql(cat, filters)));
     },
     async getDoNow(limit) {
-      if (cfg.lakebase) return mapAtRisk(await queryDoNow(cfg.lakebase, limit));
-      // Fallback: same cohort via the warehouse.
+      if (cfg.lakebase) {
+        try {
+          return mapAtRisk(await queryDoNow(cfg.lakebase, limit));
+        } catch (e) {
+          console.error("lakebase do-now failed, falling back to warehouse:", e);
+        }
+      }
+      // Fallback: same cohort via the warehouse (no live outreach-log exclusion).
       return mapAtRisk(
         await wh(atRiskSql(cat, { band: "high", noCrm: true, limit })),
       );
@@ -122,6 +144,14 @@ export function createDataApi(cfg: AppConfig): DataApi {
       return Math.round(num(rows[0]?.n));
     },
     async getUser(id) {
+      if (cfg.lakebase) {
+        try {
+          const rows = await queryUserDetail(cfg.lakebase, id);
+          return mapUserDetail(rows[0]);
+        } catch (e) {
+          console.error("lakebase user detail failed, falling back to warehouse:", e);
+        }
+      }
       const rows = await wh(userDetailSql(cat, id));
       return mapUserDetail(rows[0]);
     },
@@ -161,8 +191,21 @@ export function createDataApi(cfg: AppConfig): DataApi {
       // Nothing cached yet — generate synchronously on this first load.
       return refreshNarrative(lb);
     },
-    outreach(userId) {
-      // This build never sends externally — the action is logged in-memory only.
+    async outreach(userId) {
+      // Real write to the Lakebase-owned outreach log (system of record). The do-now
+      // queue LEFT JOINs it, so a contacted subscriber drops off the queue live —
+      // before the slower warehouse `crm_touches_30d` recompute catches up. No external
+      // CRM is ever called (simulated: true); the persisted log IS the closed loop.
+      if (cfg.lakebase) {
+        try {
+          await logOutreach(cfg.lakebase, userId);
+          return { logged: true, userId, simulated: true };
+        } catch (e) {
+          console.error("lakebase outreach log failed:", e);
+          return { logged: false, userId, simulated: true };
+        }
+      }
+      // No Lakebase configured — in-memory acknowledgement only (no persistence).
       return { logged: true, userId, simulated: true };
     },
     doNowSource() {

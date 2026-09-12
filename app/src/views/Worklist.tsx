@@ -13,6 +13,7 @@ export function Worklist() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [browseAll, setBrowseAll] = useState(false);
+  const [reload, setReload] = useState(0);
 
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
@@ -25,7 +26,7 @@ export function Worklist() {
       browseAll
         ? api.atRisk({ band: band || undefined, geo: geo || undefined, noCrm: noCrm || undefined, limit: 500 })
         : api.doNow(500),
-    [browseAll, band, geo, noCrm],
+    [browseAll, band, geo, noCrm, reload],
   );
   const doNowCount = useAsync(() => api.doNowCount(), []);
   const health = useAsync(() => api.health(), []);
@@ -79,6 +80,9 @@ export function Worklist() {
             </select>
             <button className="chip" aria-pressed={noCrm} onClick={() => setNoCrm((v) => !v)}>No CRM touch</button>
             <button className="chip" onClick={() => setBrowseAll(false)}>← Back to the priority queue</button>
+            <span className={`srcpill ${source}`}>
+              {source === "lakebase" ? "⚡ Served live from Lakebase" : "Served from warehouse"}
+            </span>
           </>
         ) : (
           <>
@@ -129,7 +133,7 @@ export function Worklist() {
         </div>
       )}
 
-      <UserDrawer userId={selected} onClose={() => setSelected(null)} />
+      <UserDrawer userId={selected} onClose={() => setSelected(null)} onLogged={() => setReload((n) => n + 1)} />
     </section>
   );
 }

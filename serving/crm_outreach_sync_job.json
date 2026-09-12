@@ -1,0 +1,18 @@
+{
+  "_comment": "Stage 6 closed-loop (layer c) — serverless PG->Delta sync of the outreach log. REVERSE of dev-churn-reverse-etl-serving. Deploy: import serving/crm_outreach_sync.py to the workspace as a NOTEBOOK, then databricks jobs create --json @serving/crm_outreach_sync_job.json (adjust notebook_path). Serverless (no cluster block); psycopg installed via %pip. PAUSED — layer (c) is an artifact, deployed in a follow-up PR. Incremental append by id high-watermark, so a frequent schedule is cheap.",
+  "name": "dev-churn-crm-outreach-sync",
+  "tasks": [
+    {
+      "task_key": "crm_outreach_sync",
+      "notebook_task": {
+        "notebook_path": "/Workspace/Users/cathy.snell@databricks.com/usage_events_ingest/serving/crm_outreach_sync"
+      }
+    }
+  ],
+  "schedule": {
+    "quartz_cron_expression": "0 0/15 * * * ?",
+    "timezone_id": "UTC",
+    "pause_status": "PAUSED"
+  },
+  "queue": {"enabled": true}
+}
