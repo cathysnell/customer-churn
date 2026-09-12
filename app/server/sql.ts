@@ -114,6 +114,19 @@ export function atRiskSql(catalog: string, f: AtRiskFilters = {}): string {
   );
 }
 
+/** COUNT of the "do this now" cohort (high-risk, currently-subscribed, no CRM touch),
+ *  uncapped — for the worklist banner headline. Governed-warehouse count, independent
+ *  of where the row list is served from. */
+export function doNowCountSql(catalog: string): string {
+  return (
+    "SELECT COUNT(*) AS n " +
+    `FROM ${catalog}.gold.churn_predictions p ` +
+    `JOIN ${catalog}.gold.churn_serving s USING (user_id) ` +
+    "WHERE p.churn_risk_band = 'high' AND s.is_currently_subscribed = TRUE " +
+    "AND s.crm_touches_30d = 0"
+  );
+}
+
 export function userDetailSql(catalog: string, userId: string): string {
   if (!isValidUserId(userId)) throw new Error(`invalid user id: ${userId}`);
   return (

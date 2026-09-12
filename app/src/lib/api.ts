@@ -46,6 +46,7 @@ export const api = {
   geoChurn: () => getJson<GeoChurn[]>("/api/geo-churn"),
   atRisk: (f: AtRiskFilters = {}) => getJson<AtRiskUser[]>(atRiskUrl(f)),
   doNow: (limit = 100) => getJson<AtRiskUser[]>(`/api/do-now?limit=${limit}`),
+  doNowCount: () => getJson<{ count: number }>("/api/do-now/count"),
   user: (id: string) => getJson<UserDetail>(`/api/user/${encodeURIComponent(id)}`),
   codingHistory: (id: string, months = 3) =>
     getJson<CodingPoint[]>(`/api/user/${encodeURIComponent(id)}/coding-history?months=${months}`),

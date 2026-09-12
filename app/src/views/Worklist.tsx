@@ -20,7 +20,7 @@ export function Worklist() {
     () => api.atRisk({ band: band || undefined, geo: geo || undefined, noCrm: noCrm || undefined, limit: 500 }),
     [band, geo, noCrm],
   );
-  const doNow = useAsync(() => api.doNow(500), []);
+  const doNowCount = useAsync(() => api.doNowCount(), []);
 
   const visible = (rows.data ?? []).filter((u) => !q || u.userId.toLowerCase().includes(q.toLowerCase()));
 
@@ -44,7 +44,7 @@ export function Worklist() {
       </div>
 
       <div className="donow">
-        <span className="cnt num">{doNow.data ? doNow.data.length.toLocaleString("en-US") : "…"}</span>
+        <span className="cnt num">{doNowCount.data ? doNowCount.data.count.toLocaleString("en-US") : "…"}</span>
         <span className="txt">
           <b>Do this now.</b> High-risk, currently-subscribed subscribers with <b>0 CRM touches</b> in 30 days.<br />
           <span className="sub">Sorted by MRR — the highest-value saves first. From the <span className="mono">untouched_at_risk_users</span> path.</span>
