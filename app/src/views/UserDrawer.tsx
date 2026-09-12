@@ -50,7 +50,15 @@ function CodingSpark({ points, color }: { points: { month: string; hours: number
   );
 }
 
-export function UserDrawer({ userId, onClose }: { userId: string | null; onClose: () => void }) {
+export function UserDrawer({
+  userId,
+  onClose,
+  onLogged,
+}: {
+  userId: string | null;
+  onClose: () => void;
+  onLogged?: () => void;
+}) {
   const open = userId !== null;
   const detail = useAsync(() => (userId ? api.user(userId) : Promise.resolve(null)), [userId]);
   const history = useAsync(
@@ -88,9 +96,19 @@ export function UserDrawer({ userId, onClose }: { userId: string | null; onClose
 
   async function logOutreach() {
     if (!u) return;
-    await api.outreach(u.userId);
-    setToast(`Outreach logged for ${u.userId} · demo — no external send`);
+    const res = await api.outreach(u.userId);
+    setToast(
+      res.logged
+        ? `Outreach logged for ${u.userId} · demo — no external send`
+        : `Couldn’t log outreach for ${u.userId}`,
+    );
     setTimeout(() => setToast(""), 2600);
+    // Closed loop: the write hits the Lakebase outreach log, so refresh the queue —
+    // this subscriber drops off it live — and close the drawer.
+    if (res.logged) {
+      onLogged?.();
+      onClose();
+    }
   }
 
   return (

@@ -36,7 +36,7 @@ function mockDeps(over: Partial<DataApi> = {}): DataApi {
     ]),
     ask: vi.fn(async (q: string): Promise<GenieAnswer> => ({ question: q, text: "answer", sql: "SELECT 1", columns: ["a"], rows: [[1]] })),
     getSoWhat: vi.fn(async () => ({ body: "Risk is concentrated.", generatedAt: "2026-09-12T00:00:00.000Z", source: "genie" as const })),
-    outreach: vi.fn((userId: string) => ({ logged: true as const, userId, simulated: true as const })),
+    outreach: vi.fn(async (userId: string) => ({ logged: true as const, userId, simulated: true as const })),
     doNowSource: vi.fn(() => "lakebase" as const),
     ...over,
   };
