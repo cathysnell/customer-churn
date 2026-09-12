@@ -50,17 +50,20 @@ fe-bar-demo/
 │   ├── project-brief.md          # industry, customer problem, outcome, KPIs
 │   ├── fe-bar-requirements.md     # program requirements, summarized
 │   ├── architecture.md            # the 6-stage journey, wired end to end
+│   ├── diagrams.md                # slide-ready process-flow + architecture diagrams (+ SVGs)
 │   └── submission-checklist.md    # what to submit + how to pass each gate
 ├── src/datagen/                   # Stage 0: synthetic dataset generator + README
 ├── tests/                         # pytest suite for the generator
 ├── sql/unity_catalog.sql          # UC registration DDL (text, schema-derived)
 ├── evidence/                      # committed TEXT execution evidence per stage
 │                                  # (data/ is generated locally and gitignored)
-├── ingest/                        # Lakeflow ingestion (TBD)
-├── notebooks/                     # notebooks committed WITH outputs visible
-├── ml/                            # ML / Gen AI assets (TBD)
-├── app/                           # Databricks App (TBD)
-└── genie/                         # Genie Room config / sample questions (TBD)
+├── ingest/                        # Stage 1: Lakeflow ingestion (metadata + usage events)
+├── metrics/                       # governed metric views (churn_metrics_current / _monthly)
+├── ml/                            # Stage 4: churn model train/score + MLflow job
+├── serving/                       # Stage 3/6: Lakebase sync, reverse ETL, app-owned tables
+├── genie/                         # Stage 5: Genie Room config + sample questions
+├── app/                           # Stage 6: Databricks App (React + Fastify)
+└── databricks.yml                 # Asset Bundle: deploys the app to Databricks Apps
 ```
 
 ## Stage 0 — the dataset
