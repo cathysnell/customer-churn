@@ -7,11 +7,3 @@ export const CHURN_BASELINE_PCT = 4.7; // illustrative
 export const REACTIVATION_PCT = 9.8; // illustrative (+22% vs baseline)
 export const REACTIVATION_BASELINE_PCT = 8.0; // illustrative
 export const PROJECTED_ANNUAL_IMPACT = 2_580_000; // illustrative ROI, ≈ $2.58M
-
-/** Which Kpis fields are illustrative (constants), for the UI's "illustrative" tag. */
-export const ILLUSTRATIVE_FIELDS = [
-  "churnBaselinePct",
-  "reactivationPct",
-  "reactivationBaselinePct",
-  "projectedAnnualImpact",
-];

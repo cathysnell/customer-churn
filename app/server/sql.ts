@@ -17,7 +17,6 @@ import {
 import {
   CHURN_BASELINE_PCT,
   CHURN_TARGET_PCT,
-  ILLUSTRATIVE_FIELDS,
   PROJECTED_ANNUAL_IMPACT,
   REACTIVATION_BASELINE_PCT,
   REACTIVATION_PCT,
@@ -91,6 +90,15 @@ export function mrrByBandSql(catalog: string): string {
     "SELECT `Risk band` AS band, MEASURE(`MRR at risk`) AS mrr " +
     `FROM ${catalog}.gold.churn_metrics_current ` +
     "GROUP BY `Risk band` ORDER BY mrr DESC"
+  );
+}
+
+/** Total currently-subscribed Pro users — context for the churn rate. Governed
+ *  MEASURE() off the current-state metric view, the same layer Genie reads. */
+export function activeSubscribersSql(catalog: string): string {
+  return (
+    "SELECT MEASURE(`Currently subscribed users`) AS n " +
+    `FROM ${catalog}.gold.churn_metrics_current`
   );
 }
 
@@ -219,7 +227,7 @@ export function mapUserDetail(row: Row | undefined): UserDetail | null {
 
 // ---- KPI assembly (live churn + MRR, illustrative reactivation + ROI) ----
 
-export function buildKpis(mrrByBand: BandMrr[], churnRatePct: number): Kpis {
+export function buildKpis(mrrByBand: BandMrr[], churnRatePct: number, activeSubscribers: number): Kpis {
   return {
     churnRatePct,
     churnTargetPct: CHURN_TARGET_PCT,
@@ -229,7 +237,7 @@ export function buildKpis(mrrByBand: BandMrr[], churnRatePct: number): Kpis {
     reactivationPct: REACTIVATION_PCT,
     reactivationBaselinePct: REACTIVATION_BASELINE_PCT,
     projectedAnnualImpact: PROJECTED_ANNUAL_IMPACT,
-    illustrative: ILLUSTRATIVE_FIELDS,
+    activeSubscribers: Math.round(activeSubscribers),
   };
 }
 

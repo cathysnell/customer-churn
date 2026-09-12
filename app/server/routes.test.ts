@@ -17,7 +17,7 @@ const sampleKpis: Kpis = {
   churnRatePct: 3.25, churnTargetPct: 4, churnBaselinePct: 4.7,
   mrrAtRiskTotal: 541488, mrrAtRiskByBand: [{ band: "high", mrr: 36568 }],
   reactivationPct: 9.8, reactivationBaselinePct: 8, projectedAnnualImpact: 2580000,
-  illustrative: ["projectedAnnualImpact"],
+  activeSubscribers: 48213,
 };
 
 function mockDeps(over: Partial<DataApi> = {}): DataApi {

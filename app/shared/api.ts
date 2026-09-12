@@ -14,7 +14,7 @@ export interface Kpis {
   reactivationPct: number; // illustrative
   reactivationBaselinePct: number; // illustrative
   projectedAnnualImpact: number; // illustrative ROI
-  illustrative: string[]; // which fields are illustrative, for the UI tag
+  activeSubscribers: number; // total currently-subscribed Pro users (live, warehouse)
 }
 
 export interface BandMrr {

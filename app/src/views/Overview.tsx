@@ -13,17 +13,14 @@ const BAND_COLOR: Record<RiskBand, string> = {
 };
 const BAND_DOT: Record<RiskBand, "high" | "med" | "low"> = { high: "high", medium: "med", low: "low" };
 
-export function Overview({ persona, onGoto }: { persona: "exec" | "am"; onGoto: (v: string) => void }) {
+export function Overview({ onGoto }: { onGoto: (v: string) => void }) {
   const kpis = useAsync(() => api.kpis(), []);
   const trend = useAsync(() => api.trend(), []);
   const geo = useAsync(() => api.geoChurn(), []);
 
-  const title = persona === "exec"
-    ? "Are we winning against the 4% churn target?"
-    : "Where should the team focus this week?";
-  const lede = persona === "exec"
-    ? "Daily churn scoring across 50,000 Pro subscribers, rolled up to the KPIs the CRO and CFO manage — churn rate, revenue at risk, and program ROI."
-    : "The headline health metrics behind your worklist — how the book is trending and where the at-risk revenue sits.";
+  const title = "Are we winning against the 4% churn target?";
+  const lede =
+    "Daily churn scoring across all Pro subscribers, rolled up to business KPIs — churn rate, revenue at risk, and program ROI.";
 
   const k = kpis.data;
   const churnUnder = k ? k.churnRatePct < k.churnTargetPct : false;
@@ -58,9 +55,10 @@ export function Overview({ persona, onGoto }: { persona: "exec" | "am"; onGoto: 
               />
               <div className="tgt" style={{ left: `${(k.churnTargetPct / (k.churnTargetPct * 1.5)) * 100}%` }} />
             </div>
+            <div className="subnote num">{k.activeSubscribers.toLocaleString("en-US")} active subscribers</div>
           </KpiCard>
 
-          <KpiCard label="MRR at risk" value={moneyShort(k.mrrAtRiskTotal)} small illustrative
+          <KpiCard label="MRR at risk" value={moneyShort(k.mrrAtRiskTotal)} small
             delta={highBand ? `${moneyShort(highBand.mrr)} in the high-risk band` : undefined} deltaDir="down">
             <div className="microsplit" title="high / medium / low">
               {k.mrrAtRiskByBand.map((b) => (
