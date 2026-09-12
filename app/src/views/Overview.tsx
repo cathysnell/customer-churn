@@ -20,7 +20,7 @@ export function Overview({ onGoto }: { onGoto: (v: string) => void }) {
 
   const title = "Are we winning against the 4% churn target?";
   const lede =
-    "Daily churn scoring across 50,000 Pro subscribers, rolled up to the KPIs the CRO and CFO manage — churn rate, revenue at risk, and program ROI.";
+    "Daily churn scoring across all Pro subscribers, rolled up to business KPIs — churn rate, revenue at risk, and program ROI.";
 
   const k = kpis.data;
   const churnUnder = k ? k.churnRatePct < k.churnTargetPct : false;
@@ -55,6 +55,7 @@ export function Overview({ onGoto }: { onGoto: (v: string) => void }) {
               />
               <div className="tgt" style={{ left: `${(k.churnTargetPct / (k.churnTargetPct * 1.5)) * 100}%` }} />
             </div>
+            <div className="subnote num">{k.activeSubscribers.toLocaleString("en-US")} active subscribers</div>
           </KpiCard>
 
           <KpiCard label="MRR at risk" value={moneyShort(k.mrrAtRiskTotal)} small

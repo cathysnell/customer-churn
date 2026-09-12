@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  activeSubscribersSql,
   atRiskSql,
   buildKpis,
   codingHistorySql,
@@ -64,6 +65,12 @@ describe("query builders", () => {
     expect(sql).toContain("s.is_currently_subscribed = TRUE");
     expect(sql).toContain("s.crm_touches_30d = 0");
     expect(sql).not.toContain("LIMIT");
+  });
+
+  it("activeSubscribersSql reads the governed measure off the current-state view", () => {
+    const sql = activeSubscribersSql("dev_churn");
+    expect(sql).toContain("MEASURE(`Currently subscribed users`)");
+    expect(sql).toContain("dev_churn.gold.churn_metrics_current");
   });
 
   it("codingHistorySql validates id, clamps months, hits churn_labels", () => {
@@ -149,7 +156,7 @@ describe("mappers", () => {
 });
 
 describe("buildKpis", () => {
-  it("sums MRR bands and attaches the illustrative constants", () => {
+  it("sums MRR bands, carries active subscribers, and attaches the illustrative constants", () => {
     const kpis = buildKpis(
       [
         { band: "low", mrr: 446184 },
@@ -157,10 +164,12 @@ describe("buildKpis", () => {
         { band: "high", mrr: 36568 },
       ],
       3.25,
+      48213,
     );
     expect(kpis.churnRatePct).toBe(3.25);
     expect(kpis.churnTargetPct).toBe(4.0);
     expect(kpis.mrrAtRiskTotal).toBe(541488);
+    expect(kpis.activeSubscribers).toBe(48213);
     expect(kpis.projectedAnnualImpact).toBe(2_580_000);
   });
 });

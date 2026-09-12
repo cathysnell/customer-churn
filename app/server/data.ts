@@ -18,6 +18,7 @@ import { queryWarehouse } from "./databricks.js";
 import { queryDoNow } from "./lakebase.js";
 import { askGenie } from "./genie.js";
 import {
+  activeSubscribersSql,
   atRiskSql,
   buildKpis,
   codingHistorySql,
@@ -57,11 +58,12 @@ export function createDataApi(cfg: AppConfig): DataApi {
 
   return {
     async getKpis() {
-      const [mrrRows, churnRows] = await Promise.all([
+      const [mrrRows, churnRows, activeRows] = await Promise.all([
         wh(mrrByBandSql(cat)),
         wh(latestChurnSql(cat)),
+        wh(activeSubscribersSql(cat)),
       ]);
-      return buildKpis(mapMrrByBand(mrrRows), latestChurnPct(churnRows));
+      return buildKpis(mapMrrByBand(mrrRows), latestChurnPct(churnRows), num(activeRows[0]?.n));
     },
     async getTrend() {
       return mapTrend(await wh(trendSql(cat)));

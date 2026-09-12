@@ -14,6 +14,7 @@ export interface Kpis {
   reactivationPct: number; // illustrative
   reactivationBaselinePct: number; // illustrative
   projectedAnnualImpact: number; // illustrative ROI
+  activeSubscribers: number; // total currently-subscribed Pro users (live, warehouse)
 }
 
 export interface BandMrr {
