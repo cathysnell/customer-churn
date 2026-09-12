@@ -17,7 +17,6 @@ import {
 import {
   CHURN_BASELINE_PCT,
   CHURN_TARGET_PCT,
-  ILLUSTRATIVE_FIELDS,
   PROJECTED_ANNUAL_IMPACT,
   REACTIVATION_BASELINE_PCT,
   REACTIVATION_PCT,
@@ -229,7 +228,6 @@ export function buildKpis(mrrByBand: BandMrr[], churnRatePct: number): Kpis {
     reactivationPct: REACTIVATION_PCT,
     reactivationBaselinePct: REACTIVATION_BASELINE_PCT,
     projectedAnnualImpact: PROJECTED_ANNUAL_IMPACT,
-    illustrative: ILLUSTRATIVE_FIELDS,
   };
 }
 

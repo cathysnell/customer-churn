@@ -4,24 +4,18 @@ import { Worklist } from "./views/Worklist";
 import { Ask } from "./views/Ask";
 
 type View = "overview" | "worklist" | "ask";
-type Persona = "exec" | "am";
 type Brand = "databricks" | "anysphere";
 
 const TABS: { id: View; label: string }[] = [
-  { id: "overview", label: "Overview" },
+  { id: "overview", label: "Executive Overview" },
   { id: "worklist", label: "Retention Worklist" },
   { id: "ask", label: "Ask" },
 ];
 
 export default function App() {
   const [view, setView] = useState<View>("overview");
-  const [persona, setPersona] = useState<Persona>("exec");
   const [brand, setBrand] = useState<Brand>("databricks");
 
-  function pickPersona(p: Persona) {
-    setPersona(p);
-    setView(p === "exec" ? "overview" : "worklist");
-  }
   function pickBrand(b: Brand) {
     setBrand(b);
     document.documentElement.dataset.brand = b;
@@ -48,11 +42,6 @@ export default function App() {
 
         <span className="spacer" />
 
-        <div className="seg" role="group" aria-label="Persona">
-          <span className="lab">View as</span>
-          <button aria-pressed={persona === "exec"} onClick={() => pickPersona("exec")}>Executive</button>
-          <button aria-pressed={persona === "am"} onClick={() => pickPersona("am")}>Account mgr</button>
-        </div>
         <div className="seg" role="group" aria-label="Brand theme">
           <span className="lab">Theme</span>
           <button aria-pressed={brand === "databricks"} onClick={() => pickBrand("databricks")}>Databricks</button>
@@ -67,7 +56,7 @@ export default function App() {
       </div>
 
       <div className="wrap">
-        {view === "overview" && <Overview persona={persona} onGoto={(v) => setView(v as View)} />}
+        {view === "overview" && <Overview onGoto={(v) => setView(v as View)} />}
         {view === "worklist" && <Worklist />}
         {view === "ask" && <Ask />}
       </div>

@@ -149,7 +149,7 @@ describe("mappers", () => {
 });
 
 describe("buildKpis", () => {
-  it("sums MRR bands and attaches illustrative constants", () => {
+  it("sums MRR bands and attaches the illustrative constants", () => {
     const kpis = buildKpis(
       [
         { band: "low", mrr: 446184 },
@@ -161,6 +161,6 @@ describe("buildKpis", () => {
     expect(kpis.churnRatePct).toBe(3.25);
     expect(kpis.churnTargetPct).toBe(4.0);
     expect(kpis.mrrAtRiskTotal).toBe(541488);
-    expect(kpis.illustrative).toContain("projectedAnnualImpact");
+    expect(kpis.projectedAnnualImpact).toBe(2_580_000);
   });
 });
