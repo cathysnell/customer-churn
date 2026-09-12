@@ -12,20 +12,29 @@ export function Worklist() {
   const [noCrm, setNoCrm] = useState(false);
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
+  const [doNowMode, setDoNowMode] = useState(false);
 
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
 
+  // In do-now mode the table streams the untouched-high-risk queue from the serving
+  // layer (Lakebase when wired, warehouse fallback otherwise); otherwise it's the
+  // general filterable at-risk list from the warehouse.
   const rows = useAsync(
-    () => api.atRisk({ band: band || undefined, geo: geo || undefined, noCrm: noCrm || undefined, limit: 500 }),
-    [band, geo, noCrm],
+    () =>
+      doNowMode
+        ? api.doNow(500)
+        : api.atRisk({ band: band || undefined, geo: geo || undefined, noCrm: noCrm || undefined, limit: 500 }),
+    [doNowMode, band, geo, noCrm],
   );
   const doNowCount = useAsync(() => api.doNowCount(), []);
+  const health = useAsync(() => api.health(), []);
+  const source = health.data?.doNowSource ?? "warehouse";
 
   const visible = (rows.data ?? []).filter((u) => !q || u.userId.toLowerCase().includes(q.toLowerCase()));
 
   // Reset to page 1 whenever the filtered set changes.
-  useEffect(() => setPage(1), [band, geo, noCrm, q]);
+  useEffect(() => setPage(1), [doNowMode, band, geo, noCrm, q]);
   const total = visible.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -43,28 +52,40 @@ export function Worklist() {
         </div>
       </div>
 
-      <div className="donow">
+      <button className="donow" aria-pressed={doNowMode} onClick={() => setDoNowMode((v) => !v)}>
         <span className="cnt num">{doNowCount.data ? doNowCount.data.count.toLocaleString("en-US") : "…"}</span>
         <span className="txt">
           <b>Do this now.</b> High-risk, currently-subscribed subscribers with <b>0 CRM touches</b> in 30 days.<br />
           <span className="sub">Sorted by MRR — the highest-value saves first. From the <span className="mono">untouched_at_risk_users</span> path.</span>
         </span>
-      </div>
+        <span className="cta">{doNowMode ? "Viewing ↓" : "Open the queue →"}</span>
+      </button>
 
       <div className="filters">
         <label className="search">
           <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" /><path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search user id…" aria-label="Search user id" />
         </label>
-        <select className="fsel" value={band} onChange={(e) => setBand(e.target.value as RiskBand | "")} aria-label="Risk band">
-          <option value="">All bands</option>
-          {RISK_BANDS.map((b) => <option key={b} value={b}>{b}</option>)}
-        </select>
-        <select className="fsel" value={geo} onChange={(e) => setGeo(e.target.value)} aria-label="Region">
-          <option value="">All regions</option>
-          {GEOS.map((g) => <option key={g} value={g}>{g}</option>)}
-        </select>
-        <button className="chip" aria-pressed={noCrm} onClick={() => setNoCrm((v) => !v)}>No CRM touch</button>
+        {doNowMode ? (
+          <>
+            <span className={`srcpill ${source}`}>
+              {source === "lakebase" ? "⚡ Served live from Lakebase" : "Served from warehouse"}
+            </span>
+            <button className="chip" onClick={() => setDoNowMode(false)}>← All at-risk subscribers</button>
+          </>
+        ) : (
+          <>
+            <select className="fsel" value={band} onChange={(e) => setBand(e.target.value as RiskBand | "")} aria-label="Risk band">
+              <option value="">All bands</option>
+              {RISK_BANDS.map((b) => <option key={b} value={b}>{b}</option>)}
+            </select>
+            <select className="fsel" value={geo} onChange={(e) => setGeo(e.target.value)} aria-label="Region">
+              <option value="">All regions</option>
+              {GEOS.map((g) => <option key={g} value={g}>{g}</option>)}
+            </select>
+            <button className="chip" aria-pressed={noCrm} onClick={() => setNoCrm((v) => !v)}>No CRM touch</button>
+          </>
+        )}
       </div>
 
       <div className="card tablecard">

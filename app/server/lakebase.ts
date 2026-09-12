@@ -1,22 +1,27 @@
 // Lakebase Postgres executor for the low-latency "do this now" queue — features the
 // Stage-3 serving layer doing its job inside the app. A lazily-created pooled client.
 
-import pg from "pg";
+import type pg from "pg";
+import { createLakebasePool } from "@databricks/lakebase";
 import type { LakebaseConfig } from "./config.js";
 import type { Row } from "./sql.js";
 
-const { Pool } = pg;
 let pool: pg.Pool | null = null;
 
+// createLakebasePool returns a standard pg.Pool whose password is a callback that
+// mints/refreshes a short-lived OAuth token per physical connection (Lakebase tokens
+// expire ~1h). In Databricks Apps the app SP identity is auto-resolved from the
+// ServiceContext; locally, a static `password` (if set) is used and OAuth is skipped.
 function getPool(cfg: LakebaseConfig): pg.Pool {
   if (!pool) {
-    pool = new Pool({
+    pool = createLakebasePool({
       host: cfg.host,
       port: cfg.port,
       database: cfg.database,
+      endpoint: cfg.endpoint || undefined,
+      sslMode: cfg.sslMode,
       user: cfg.user,
       password: cfg.password,
-      ssl: cfg.ssl ? { rejectUnauthorized: false } : false,
       max: 4,
       idleTimeoutMillis: 30_000,
     });

@@ -19,19 +19,33 @@ describe("loadConfig", () => {
     expect(loadConfig({ PORT: "9000", DATABRICKS_APP_PORT: "8123" }).port).toBe(9000);
   });
 
-  it("disables lakebase unless host+user+password are all present", () => {
-    expect(loadConfig({ LAKEBASE_HOST: "h", LAKEBASE_USER: "u" }).lakebase).toBeNull();
+  it("disables lakebase without host, or with host but no endpoint/password", () => {
+    expect(loadConfig({ LAKEBASE_ENDPOINT: "projects/x/branches/y/endpoints/z" }).lakebase).toBeNull();
+    expect(loadConfig({ LAKEBASE_HOST: "h" }).lakebase).toBeNull();
+  });
+
+  it("enables lakebase via OAuth (host + endpoint, the Apps path)", () => {
+    const cfg = loadConfig({
+      LAKEBASE_HOST: "ep-abc.database.cloud.databricks.com",
+      LAKEBASE_ENDPOINT: "projects/dev-churn-serving/branches/production/endpoints/primary",
+    });
+    expect(cfg.lakebase).toMatchObject({
+      host: "ep-abc.database.cloud.databricks.com",
+      database: "databricks_postgres",
+      endpoint: "projects/dev-churn-serving/branches/production/endpoints/primary",
+      sslMode: "require",
+    });
+    expect(cfg.lakebase?.password).toBeUndefined(); // OAuth, not a static secret
+  });
+
+  it("enables lakebase via a static password (local dev), sslMode honored", () => {
     const cfg = loadConfig({
       LAKEBASE_HOST: "pg.example.com",
       LAKEBASE_USER: "app_sp",
       LAKEBASE_PASSWORD: "secret",
       LAKEBASE_SSL: "false",
     });
-    expect(cfg.lakebase).toMatchObject({
-      host: "pg.example.com",
-      database: "databricks_postgres",
-      ssl: false,
-    });
+    expect(cfg.lakebase).toMatchObject({ host: "pg.example.com", sslMode: "disable", password: "secret" });
   });
 
   it("reports missing warehouse config", () => {
