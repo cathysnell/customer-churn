@@ -23,7 +23,7 @@ import {
 } from "./constants.js";
 import { queryWarehouse } from "./databricks.js";
 import { queryDoNow, readNarrative, writeNarrative } from "./lakebase.js";
-import { askGenie, cleanNarrative } from "./genie.js";
+import { askGenie, askGenieNarrative, cleanNarrative } from "./genie.js";
 import {
   activeSubscribersSql,
   atRiskSql,
@@ -75,8 +75,8 @@ export function createDataApi(cfg: AppConfig): DataApi {
   // every page load (the box refreshes on the next weekly window or redeploy).
   async function refreshNarrative(lb: LakebaseConfig): Promise<SoWhat> {
     try {
-      const ans = await askGenie(cfg, SO_WHAT_PROMPT);
-      const body = cleanNarrative(ans.text);
+      const raw = await askGenieNarrative(cfg, SO_WHAT_PROMPT);
+      const body = cleanNarrative(raw);
       if (!body) throw new Error("empty genie narrative");
       await writeNarrative(lb, SO_WHAT_CACHE_KEY, body, "genie");
       return { body, generatedAt: new Date().toISOString(), source: "genie" };

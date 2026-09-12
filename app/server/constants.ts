@@ -24,7 +24,8 @@ export const SO_WHAT_PROMPT =
   "In one or two sentences, give an executive 'so what' interpretation of the current " +
   "Pro-tier subscriber churn situation and the single most important retention action " +
   "to focus on this month. Be concise and qualitative — do not quote specific dollar " +
-  "amounts, percentages, or subscriber counts.";
+  "amounts, percentages, or subscriber counts, and do not reference the query, the " +
+  "underlying data, or the number of rows. Reply with the narrative only.";
 
 /** Templated qualitative fallback when Genie / the cache is unavailable. Carries no
  *  numbers (those come from the governed endpoints) and shows no "Powered by Genie" pill. */

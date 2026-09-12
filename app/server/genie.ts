@@ -28,6 +28,20 @@ export function extractQueryAttachmentId(message: Json): string | null {
   return att?.attachment_id ?? null;
 }
 
+/** Pick the substantive narrative text from a completed Genie message. Genie can emit
+ *  a clarifying follow-up question as one text attachment and the real prose as another
+ *  (and does not order them predictably), so we take the longest text attachment that
+ *  isn't just a question, falling back to any text, then the message content. */
+export function pickNarrativeText(message: Json): string {
+  const texts: string[] = (message.attachments ?? [])
+    .map((a: Json) => a?.text?.content)
+    .filter((t: unknown): t is string => typeof t === "string" && t.trim().length > 0);
+  if (texts.length === 0) return message?.content ?? "";
+  const substantive = texts.filter((t) => !t.trim().endsWith("?"));
+  const pool = substantive.length ? substantive : texts;
+  return pool.reduce((a, b) => (b.length > a.length ? b : a));
+}
+
 export function parseStatementResult(payload: Json): {
   columns: string[];
   rows: (string | number | null)[][];
@@ -42,12 +56,23 @@ export function parseStatementResult(payload: Json): {
   return { columns, rows };
 }
 
-/** Tidy a Genie free-text answer for display in the narrative box: collapse
- *  whitespace/newlines, strip wrapping quotes, and cap length at a sentence break.
- *  Pure. */
-export function cleanNarrative(text: string, maxLen = 320): string {
+/** Tidy a Genie free-text answer for display in the plain-text narrative box:
+ *  collapse whitespace/newlines, strip wrapping quotes, drop markdown emphasis
+ *  markers, remove a trailing "…N rows shown" data-reference artifact, and keep the
+ *  first couple of sentences under a length cap. Pure. */
+export function cleanNarrative(text: string, maxLen = 520): string {
   let s = (text ?? "").replace(/\s+/g, " ").trim();
   s = s.replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
+  // Strip markdown emphasis (**bold**, *italic*, __bold__, _italic_) — the box renders plain text.
+  s = s.replace(/\*\*(.+?)\*\*/g, "$1").replace(/__(.+?)__/g, "$1");
+  s = s.replace(/\*(.+?)\*/g, "$1").replace(/_(.+?)_/g, "$1");
+  // Drop a trailing "…across/in/based on N rows (shown)" reference to the query result.
+  s = s.replace(/[,;]?\s*(across|in|based on|over|from)\s+(all\s+)?\d+\s+rows?(\s+\w+){0,2}(?=\.?\s*$)/i, "");
+  s = s.replace(/\s+([.!?])/g, "$1").trim();
+  // Keep at most the first two sentences.
+  const parts = s.match(/[^.!?]+[.!?]+/g);
+  if (parts && parts.length > 2) s = parts.slice(0, 2).map((p) => p.trim()).join(" ");
+  // Hard length safety.
   if (s.length > maxLen) {
     const cut = s.slice(0, maxLen);
     const stop = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
@@ -90,10 +115,12 @@ function base(cfg: AppConfig): string {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function askGenie(
+/** Start a conversation and poll the message to completion. Returns the completed
+ *  message plus the message URL + headers so callers can fetch attachments. */
+async function runConversation(
   cfg: AppConfig,
   question: string,
-): Promise<GenieAnswer> {
+): Promise<{ message: Json; msgUrl: string; h: Record<string, string> }> {
   const h = headers(await getBearer(cfg));
   const startRes = await fetch(`${base(cfg)}/start-conversation`, {
     method: "POST",
@@ -117,6 +144,14 @@ export async function askGenie(
     if (Date.now() > deadline) throw new Error("genie poll timed out");
     await sleep(POLL_INTERVAL_MS);
   }
+  return { message, msgUrl, h };
+}
+
+export async function askGenie(
+  cfg: AppConfig,
+  question: string,
+): Promise<GenieAnswer> {
+  const { message, msgUrl, h } = await runConversation(cfg, question);
 
   let columns: string[] = [];
   let rows: (string | number | null)[][] = [];
@@ -135,4 +170,12 @@ export async function askGenie(
     columns,
     rows,
   };
+}
+
+/** Ask Genie for a qualitative narrative and return just the substantive text. Skips
+ *  the query-result fetch (we don't render rows here) and picks the narrative
+ *  attachment rather than any clarifying follow-up. */
+export async function askGenieNarrative(cfg: AppConfig, question: string): Promise<string> {
+  const { message } = await runConversation(cfg, question);
+  return pickNarrativeText(message);
 }

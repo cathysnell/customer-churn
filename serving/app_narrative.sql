@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS public.app_narrative (
 COMMENT ON TABLE public.app_narrative IS
   'Retention Cockpit app cache: Genie-authored qualitative narratives (e.g. the Overview "So what?" box), refreshed ~weekly. Lakebase is the system of record; not synced from Delta.';
 
--- Grant the app service principal read + upsert. Replace <APP_SP_ROLE> with the
--- Postgres role the Databricks App connects as (the app SP's identity in Lakebase).
--- GRANT SELECT, INSERT, UPDATE ON public.app_narrative TO "<APP_SP_ROLE>";
+-- Grant the app service principal read + upsert. The SP's Postgres role (named for
+-- its client id) already exists from app/lakebase_grants.sql (Stage 6 do-now grants),
+-- so only the per-table grant is needed here.
+GRANT SELECT, INSERT, UPDATE ON public.app_narrative TO "1768cda0-b24e-493f-8b2f-16fb8b8eda3a";
