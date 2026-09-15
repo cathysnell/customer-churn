@@ -115,6 +115,9 @@ select.fsel{border:1px solid var(--border); background:var(--surface); color:var
 .donow .cnt{font-family:var(--font-display); font-weight:800; font-size:30px; color:var(--risk-high); letter-spacing:-.02em; line-height:1; flex:none}
 .donow .txt{font-size:13.5px; color:var(--text)} .donow .txt b{font-weight:700}
 .donow .txt .sub{color:var(--muted); font-size:12.5px}
+/* Browse-all variant: informational (neutral), not the red do-now urgency treatment. */
+.donow.browse{background:linear-gradient(90deg,var(--surface-2),transparent)}
+.donow.browse .cnt{color:var(--text)}
 .srcpill{font-size:11.5px; font-weight:700; padding:5px 11px; border-radius:20px; white-space:nowrap; background:var(--surface-3); color:var(--muted)}
 .srcpill.lakebase{background:var(--risk-low-bg); color:var(--good)}
 .tablecard{overflow:hidden}
@@ -152,16 +155,27 @@ tbody td{padding:11px 16px; white-space:nowrap}
 /* drawer */
 .scrim{position:fixed; inset:0; background:rgba(10,20,24,.42); opacity:0; pointer-events:none; transition:opacity .3s ease; z-index:40}
 .scrim.open{opacity:1; pointer-events:auto}
-.drawer{position:fixed; top:0; right:0; bottom:0; width:min(440px,94vw); background:var(--surface); border-left:1px solid var(--border); box-shadow:var(--shadow-lift); z-index:50; transform:translateX(100%); transition:transform .32s cubic-bezier(.4,0,.2,1); display:flex; flex-direction:column; overflow:hidden}
+/* height:100dvh (with a vh fallback) instead of top/bottom:0 so the panel tracks the
+   *dynamic* viewport — on mobile the footer isn't hidden under the browser toolbar. */
+.drawer{position:fixed; top:0; right:0; height:100vh; height:100dvh; width:min(440px,94vw); background:var(--surface); border-left:1px solid var(--border); box-shadow:var(--shadow-lift); z-index:50; transform:translateX(100%); transition:transform .32s cubic-bezier(.4,0,.2,1); display:flex; flex-direction:column; overflow:hidden}
 .drawer.open{transform:none}
 .dwr-h{padding:18px 20px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; justify-content:space-between; gap:12px}
 .dwr-h .who{font-size:12.5px; color:var(--muted); margin-top:3px}
 .xbtn{appearance:none; border:1px solid var(--border); background:var(--surface); color:var(--muted); width:30px; height:30px; border-radius:8px; cursor:pointer; font-size:16px; line-height:1; flex:none}
 .xbtn:hover{color:var(--text); background:var(--surface-2)}
-.dwr-b{padding:18px 20px; flex:1 1 auto; min-height:0; overflow-y:auto; scrollbar-gutter:stable; scrollbar-width:thin; scrollbar-color:var(--muted) transparent; display:flex; flex-direction:column; gap:18px}
+.dwr-b{padding:18px 20px; flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; scrollbar-color:var(--muted) transparent; display:flex; flex-direction:column; gap:18px}
+/* Critical: this is a flex column AND the scroll container. Without this, short viewports
+   make flexbox *shrink* the children to fit (min-height:auto), so nothing overflows,
+   overflow-y:auto never engages, and the content is silently truncated with no scrollbar.
+   flex-shrink:0 keeps children at natural height so the body actually scrolls. */
+.dwr-b > *{flex-shrink:0}
 .dwr-b::-webkit-scrollbar{width:10px}
 .dwr-b::-webkit-scrollbar-thumb{background:var(--border); border-radius:6px; border:2px solid var(--surface)}
 .dwr-b::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+/* Pinned action footer — always visible, never scrolls off. The top shadow doubles as a
+   "content continues above" affordance so it reads as scrollable. */
+.dwr-f{flex:none; padding:12px 20px; border-top:1px solid var(--border); background:var(--surface); box-shadow:0 -6px 14px -12px rgba(10,20,24,.5); display:flex; gap:9px; align-items:center}
+.dwr-f .fnote{font-size:11px; color:var(--muted); margin-left:auto}
 .sig{background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:14px}
 .sig .cap{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:700; margin-bottom:6px}
 .sig .sigrow{display:flex; align-items:baseline; justify-content:space-between; gap:10px}
@@ -174,7 +188,6 @@ tbody td{padding:11px 16px; white-space:nowrap}
 .play .ph{padding:11px 14px; background:var(--surface-2); font-size:12px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--border)}
 .play .ph .genie{font-size:10px; font-weight:700; color:var(--good); background:var(--risk-low-bg); padding:2px 7px; border-radius:5px; letter-spacing:.03em}
 .play .msg{padding:14px; font-size:13.5px; line-height:1.6; white-space:pre-wrap}
-.play .foot{padding:11px 14px; border-top:1px solid var(--border); display:flex; gap:9px; align-items:center}
 .btnp{appearance:none; border:0; cursor:pointer; background:var(--action); color:var(--on-action); font-weight:600; font-size:13px; padding:9px 14px; border-radius:9px}
 .btnp:hover{background:var(--action-hover)}
 .btns{appearance:none; border:1px solid var(--border); background:var(--surface); color:var(--text); font-weight:600; font-size:13px; padding:9px 14px; border-radius:9px; cursor:pointer}

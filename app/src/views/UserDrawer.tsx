@@ -147,12 +147,14 @@ export function UserDrawer({
               <div className="play">
                 <div className="ph">Suggested re-engagement <span className="genie">drafted by Agent Bricks</span></div>
                 <div className="msg">{DRAFTS[u.persona] ?? DRAFTS.individual_dev}</div>
-                <div className="foot">
-                  <button className="btnp" onClick={logOutreach}>Log outreach</button>
-                  <button className="btns">Add to campaign</button>
-                  <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: "auto" }}>review before sending</span>
-                </div>
               </div>
+            </div>
+            {/* Pinned footer: the primary actions stay visible even when the body
+                scrolls, so they can never be truncated below the fold. */}
+            <div className="dwr-f">
+              <button className="btnp" onClick={logOutreach}>Log outreach</button>
+              <button className="btns">Add to campaign</button>
+              <span className="fnote">review before sending</span>
             </div>
           </>
         )}
