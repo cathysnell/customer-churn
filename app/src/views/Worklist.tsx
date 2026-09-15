@@ -42,6 +42,9 @@ export function Worklist() {
   const pageRows = visible.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
   const from = total === 0 ? 0 : (pageSafe - 1) * PAGE_SIZE + 1;
   const to = Math.min(pageSafe * PAGE_SIZE, total);
+  // The at-risk list is capped at 500 rows by the API; flag when we're at the cap so
+  // the count reads honestly ("500+ · top 500 by MRR") rather than implying an exact total.
+  const atCap = (rows.data?.length ?? 0) >= 500;
 
   return (
     <section>
@@ -59,6 +62,16 @@ export function Worklist() {
           <span className="txt">
             <b>Do this now.</b> High-risk, currently-subscribed subscribers with <b>0 CRM touches</b> in 30 days.<br />
             <span className="sub">Sorted by MRR — the highest-value saves first. From the <span className="mono">untouched_at_risk_users</span> path.</span>
+          </span>
+        </div>
+      )}
+
+      {browseAll && (
+        <div className="donow browse">
+          <span className="cnt num">{rows.loading ? "…" : `${total.toLocaleString("en-US")}${atCap ? "+" : ""}`}</span>
+          <span className="txt">
+            <b>All at-risk subscribers</b> matching the filters below{q ? " and your search" : ""}.<br />
+            <span className="sub">{atCap ? "Showing the top 500 by MRR. " : ""}Currently-subscribed Pro users with a churn-risk score.</span>
           </span>
         </div>
       )}
