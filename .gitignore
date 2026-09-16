@@ -30,9 +30,13 @@
 # Python
 __pycache__/
 *.pyc
+*.egg-info/
 .venv/
 venv/
 .ipynb_checkpoints/
+
+# Local tool state (Isaac)
+.isaac/
 
 # OS / editor
 .DS_Store
