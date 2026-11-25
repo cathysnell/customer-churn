@@ -81,7 +81,9 @@
 .callout .big{font-size:15px; line-height:1.55; font-weight:500; margin:0}
 .callout .big b{color:var(--text)}
 .callout .hl{color:var(--risk-high); font-weight:700}
-.jump{margin-top:auto; appearance:none; border:0; cursor:pointer; align-self:flex-start; background:var(--action); color:var(--on-action); font-weight:600; font-size:13.5px; padding:9px 15px; border-radius:9px; display:inline-flex; align-items:center; gap:7px}
+/* the jump buttons sit together in one row, pinned to the bottom of the callout card */
+.jumps{margin-top:auto; align-self:flex-start; display:flex; flex-wrap:wrap; gap:10px}
+.jump{appearance:none; border:0; cursor:pointer; background:var(--action); color:var(--on-action); font-weight:600; font-size:13.5px; padding:9px 15px; border-radius:9px; display:inline-flex; align-items:center; gap:7px}
 .jump:hover{background:var(--action-hover)}
 
 /* genie narrative (the qualitative "so what", cached weekly from the Genie space) */
