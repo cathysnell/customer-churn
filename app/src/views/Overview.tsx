@@ -5,6 +5,7 @@ import { BarList } from "../components/BarList";
 import { TrendChart } from "../components/TrendChart";
 import { moneyShort, pct, geoSeverity, shortDate } from "../lib/format";
 import type { RiskBand } from "../../shared/api";
+import type { View } from "../App";
 
 const BAND_COLOR: Record<RiskBand, string> = {
   high: "var(--risk-high)",
@@ -13,7 +14,7 @@ const BAND_COLOR: Record<RiskBand, string> = {
 };
 const BAND_DOT: Record<RiskBand, "high" | "med" | "low"> = { high: "high", medium: "med", low: "low" };
 
-export function Overview({ onGoto }: { onGoto: (v: string) => void }) {
+export function Overview({ onGoto }: { onGoto: (v: View) => void }) {
   const kpis = useAsync(() => api.kpis(), []);
   const trend = useAsync(() => api.trend(), []);
   const geo = useAsync(() => api.geoChurn(), []);

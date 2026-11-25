@@ -3,7 +3,7 @@ import { Overview } from "./views/Overview";
 import { Worklist } from "./views/Worklist";
 import { Ask } from "./views/Ask";
 
-type View = "overview" | "worklist" | "ask";
+export type View = "overview" | "worklist" | "ask";
 type Brand = "databricks" | "anysphere";
 
 const TABS: { id: View; label: string }[] = [
@@ -56,7 +56,7 @@ export default function App() {
       </div>
 
       <div className="wrap">
-        {view === "overview" && <Overview onGoto={(v) => setView(v as View)} />}
+        {view === "overview" && <Overview onGoto={setView} />}
         {view === "worklist" && <Worklist />}
         {view === "ask" && <Ask />}
       </div>
