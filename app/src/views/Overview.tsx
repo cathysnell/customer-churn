@@ -123,7 +123,10 @@ export function Overview({ onGoto }: { onGoto: (v: string) => void }) {
                 )}
               </div>
             )}
-            <button className="jump" onClick={() => onGoto("worklist")}>Open the worklist <span aria-hidden>→</span></button>
+            <div className="jumps">
+              <button className="jump" onClick={() => onGoto("worklist")}>Open the worklist <span aria-hidden>→</span></button>
+              <button className="jump" onClick={() => onGoto("ask")}>Ask a question <span aria-hidden>→</span></button>
+            </div>
           </div>
         </div>
       </div>
